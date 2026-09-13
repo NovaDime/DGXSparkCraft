@@ -9,7 +9,7 @@ from uuid import uuid4
 from pydantic import ValidationError
 
 from .config import Settings
-from .models import AgentResult, MeetingRequest, TERMINAL_STATUSES
+from .models import AgentResult, MIN_ROUNDS, MeetingRequest, TERMINAL_STATUSES
 from .reporting import render_report
 from .skills import SkillCatalog
 from .storage import MeetingStore
@@ -51,7 +51,7 @@ class RoundtableEngine:
         stamp = now()
         meeting = {
             "id": uuid4().hex, "topic": request.topic, "constraints": request.constraints,
-            "max_rounds": request.max_rounds, "include_reviewer": request.include_reviewer,
+            "max_rounds": request.max_rounds, "include_reviewer": True,
             "provider_mode": self.settings.provider_mode, "status": "queued",
             "created_at": stamp, "updated_at": stamp, "current_round": 0,
             "proposal": "", "final_report": "", "error": None,
@@ -186,7 +186,7 @@ class RoundtableEngine:
                     raise ValueError("主持者没有提供可供评审的初始方案。")
                 meeting["proposal"] = opening.proposal
                 self.store.save(meeting)
-                specialists = ["planner", "balance", "engineer"] + (["reviewer"] if meeting["include_reviewer"] else [])
+                specialists = ["planner", "balance", "engineer", "reviewer"]
                 for round_index in range(1, meeting["max_rounds"] + 1):
                     meeting["current_round"] = round_index
                     reviewed_proposal = meeting["proposal"]
@@ -205,12 +205,16 @@ class RoundtableEngine:
                     unchanged = revised.strip() == reviewed_proposal.strip()
                     meeting["proposal"] = revised
                     no_open_issues = not any(item["status"] == "open" for item in meeting["issues"])
-                    if all_approve and synthesis.stance == "approve" and no_open_issues and unchanged:
+                    if round_index >= MIN_ROUNDS and all_approve and synthesis.stance == "approve" and no_open_issues and unchanged:
                         self._finish(meeting, "completed", "模拟流程收敛；需要真实模型进一步验证。" if meeting["provider_mode"] == "simulation" else "各专业角色已认可同一版方案，当前已登记分歧全部关闭。")
                         return
                     if all_approve and not unchanged:
                         self._event(meeting, "draft_changed", "主管修改了已审阅方案，需要下一轮重新评审，不能直接视为共识。")
-                    self._event(meeting, "round_completed", "仍有分歧、保留意见或新修订，继续评审。", round=round_index)
+                    if round_index < MIN_ROUNDS and all_approve and synthesis.stance == "approve" and unchanged:
+                        message = "当前方案已获同意，但尚未完成至少三轮评审，继续复核。"
+                    else:
+                        message = "仍有分歧、保留意见或新修订，继续评审。"
+                    self._event(meeting, "round_completed", message, round=round_index)
                 self._finish(meeting, "needs_review", "已达到轮数上限。当前方案及所有保留意见已保存，尚未达成共识。")
         except asyncio.CancelledError:
             if meeting["status"] not in TERMINAL_STATUSES:

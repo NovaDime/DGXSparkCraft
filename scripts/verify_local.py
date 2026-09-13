@@ -33,7 +33,9 @@ async def verify(output: Path) -> dict:
             final = store.get(meeting["id"])
             checks = {
                 "simulation_marked": final["provider_mode"] == "simulation" and "规则模拟" in final["final_report"],
-                "two_round_review": final["current_round"] == 2,
+                "three_round_review": final["current_round"] == 3,
+                "five_roles_each_round": [turn["role_id"] for turn in final["turns"]] ==
+                    ["host"] + ["planner", "balance", "engineer", "reviewer", "host"] * 3,
                 "consensus_guard_passed": final["status"] == "completed",
                 "objections_were_recorded": len(final["issues"]) > 0,
                 "objections_were_resolved": all(item["status"] == "resolved" for item in final["issues"]),

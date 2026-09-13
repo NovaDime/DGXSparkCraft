@@ -45,8 +45,6 @@ class Settings:
     agent_ids: dict[str, str] = field(default_factory=lambda: {
         role: role for role in ("host", "planner", "balance", "engineer", "reviewer")
     })
-    max_rounds_default: int = 6
-    max_rounds_max: int = 20
     max_queued_meetings: int = 10
 
     def __post_init__(self):

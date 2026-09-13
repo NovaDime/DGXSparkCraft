@@ -84,17 +84,37 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         provider = ScriptedProvider()
         meeting = await self.run_meeting(provider)
         self.assertEqual(meeting["status"], "completed")
-        self.assertEqual([role for role, context in provider.calls], ["host", "planner", "balance", "engineer", "reviewer", "host"])
+        self.assertEqual(meeting["current_round"], 3)
+        self.assertEqual([role for role, context in provider.calls],
+                         ["host"] + ["planner", "balance", "engineer", "reviewer", "host"] * 3)
         self.assertEqual({context["proposal"] for _, context in provider.calls if context["phase"] == "review"}, {"首版方案"})
         self.assertIsNone(meeting["metrics"]["input_tokens"])
         self.assertIn("规则模拟", meeting["final_report"])
         self.assertTrue(all(turn["skill_sha256"] for turn in meeting["turns"]))
 
-    async def test_optional_second_programmer(self):
-        provider = ScriptedProvider()
-        meeting = await self.run_meeting(provider, include_reviewer=False)
+    async def test_fourth_round_when_third_round_raises_issue(self):
+        def behavior(role, context):
+            if role["id"] == "planner" and context["round"] == 3:
+                return answer(stance="revise", concerns=[{"title": "第三轮新问题", "detail": "需要再核验", "severity": "major"}])
+            if role["id"] == "planner" and context["round"] == 4:
+                return answer(resolved_issue_ids=[context["issues"][0]["id"]])
+        provider = ScriptedProvider(behavior)
+        meeting = await self.run_meeting(provider, max_rounds=4)
         self.assertEqual(meeting["status"], "completed")
-        self.assertNotIn("reviewer", [role for role, _ in provider.calls])
+        self.assertEqual(meeting["current_round"], 4)
+        self.assertEqual(len(provider.calls), 21)
+        self.assertEqual(meeting["issues"][0]["status"], "resolved")
+
+    async def test_four_round_limit_keeps_unresolved_issue(self):
+        def behavior(role, context):
+            if role["id"] == "planner" and context["round"] == 1:
+                return answer(stance="revise", concerns=[{"title": "未解决问题", "detail": "仍需人工判断", "severity": "major"}])
+        provider = ScriptedProvider(behavior)
+        meeting = await self.run_meeting(provider, max_rounds=4)
+        self.assertEqual(meeting["status"], "needs_review")
+        self.assertEqual(meeting["current_round"], 4)
+        self.assertEqual(len(provider.calls), 21)
+        self.assertEqual(meeting["issues"][0]["status"], "open")
 
     async def test_explicit_owner_resolution_and_second_round(self):
         def behavior(role, context):
@@ -106,15 +126,16 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
                 return answer(stance="revise", proposal="第二版：服务端校验与领取流水唯一键。")
         meeting = await self.run_meeting(ScriptedProvider(behavior))
         self.assertEqual(meeting["status"], "completed")
-        self.assertEqual(meeting["current_round"], 2)
+        self.assertEqual(meeting["current_round"], 3)
         self.assertEqual(meeting["issues"][0]["status"], "resolved")
+        self.assertEqual(meeting["issues"][0]["resolved_round"], 2)
         self.assertIn("唯一键", meeting["issues"][0]["resolution"])
 
     async def test_host_cannot_override_open_objections(self):
         def behavior(role, context):
             if role["id"] == "planner" and context["round"] == 1:
                 return answer(stance="revise", concerns=[{"title": "目标不明", "detail": "玩家目的未定义", "severity": "minor"}])
-        meeting = await self.run_meeting(ScriptedProvider(behavior), max_rounds=2)
+        meeting = await self.run_meeting(ScriptedProvider(behavior), max_rounds=3)
         self.assertEqual(meeting["status"], "needs_review")
         self.assertEqual(meeting["issues"][0]["status"], "open")
 
@@ -124,7 +145,7 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
                 return answer(stance="revise", concerns=[{"title": "状态冲突", "detail": "多人同时领取", "severity": "blocker"}])
             if role["id"] == "reviewer":
                 return answer(resolved_issue_ids=["I001"])
-        meeting = await self.run_meeting(ScriptedProvider(behavior), max_rounds=2)
+        meeting = await self.run_meeting(ScriptedProvider(behavior), max_rounds=3)
         self.assertEqual(meeting["status"], "needs_review")
         self.assertEqual(meeting["issues"][0]["status"], "open")
         self.assertTrue(any(event["type"] == "resolution_ignored" for event in meeting["events"]))
@@ -133,7 +154,7 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         def behavior(role, context):
             if context["phase"] == "synthesis":
                 return answer(proposal=context["proposal"] + " 新增未经审阅的规则。")
-        meeting = await self.run_meeting(ScriptedProvider(behavior), max_rounds=2)
+        meeting = await self.run_meeting(ScriptedProvider(behavior), max_rounds=3)
         self.assertEqual(meeting["status"], "needs_review")
         self.assertTrue(any(event["type"] == "draft_changed" for event in meeting["events"]))
 
@@ -141,7 +162,7 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         def behavior(role, context):
             if role["id"] == "balance":
                 return answer(stance="revise", summary="需要进一步提供收益范围。")
-        meeting = await self.run_meeting(ScriptedProvider(behavior), max_rounds=1)
+        meeting = await self.run_meeting(ScriptedProvider(behavior), max_rounds=3)
         self.assertEqual(meeting["status"], "needs_review")
 
     async def test_serial_inference_across_multiple_meetings(self):

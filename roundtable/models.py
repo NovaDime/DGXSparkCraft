@@ -3,14 +3,16 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 TERMINAL_STATUSES = {"completed", "needs_review", "cancelled", "failed", "interrupted"}
+MIN_ROUNDS = 3
+MAX_ROUNDS = 4
+DEFAULT_ROUNDS = 3
 
 
 class MeetingRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     topic: str = Field(min_length=4, max_length=4000)
     constraints: str = Field(default="", max_length=4000)
-    max_rounds: int = Field(default=6, ge=1, le=20, strict=True)
-    include_reviewer: bool = Field(default=True, strict=True)
+    max_rounds: int = Field(default=DEFAULT_ROUNDS, ge=MIN_ROUNDS, le=MAX_ROUNDS, strict=True)
 
 
 class Concern(BaseModel):

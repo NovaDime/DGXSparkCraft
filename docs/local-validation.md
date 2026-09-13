@@ -1,8 +1,18 @@
-# 本地验收记录 · 2026-09-13
+# 本地验收记录
 
-当前版本 0.1.0，在 Windows 本地运行。验收对象是从零实现的 Python 圆桌、专业 Skills 和网页；实际 OpenClaw、Spark 模型和网易游戏环境尚未联调。
+## 五角色、3 至 4 轮分支验证 · 2026-09-13
 
-## 自动化结果
+在 `feat/five-agent-three-four-rounds` 分支执行 `python -B -m unittest discover -s tests -v`：63 项通过。覆盖新会议固定五角色、至少三轮后才能收敛、第三轮新增问题时进入第四轮、第四轮仍有分歧时待复核，以及 API 和页面限制。
+
+执行 `python -B scripts/verify_local.py`：7 项本地规则模拟检查通过，完成 3 轮、16 次发言；五角色顺序、分歧登记与关闭、Skill 指纹均通过。可审阅文件仍位于 `artifacts/local-verification/`。
+
+执行 `node --check roundtable/static/app.js`：语法检查通过。本次未进行新版页面浏览器验收、真实 OpenClaw 调用或 Spark 联调；上述结果不代表模型效果和设备性能。
+
+## 先前版本的历史验收 · 2026-09-13
+
+以下记录来自改动前版本 0.1.0，当时允许关闭第二位程序员，会议也可在第一或第二轮结束；不作为当前分支的验收结论。验收对象是从零实现的 Python 圆桌、专业 Skills 和网页；实际 OpenClaw、Spark 模型和网易游戏环境尚未联调。
+
+### 自动化结果
 
 `python -m unittest discover -s tests -v`：60 项通过（加入 Windows 运行管理脚本后的完整回归）。完整输出位于 `artifacts/test-output.txt`。
 
@@ -20,7 +30,7 @@ Windows 管理脚本新增 5 项实际进程测试：重复启动不重复创建
 
 `node --check roundtable/static/app.js`：语法检查通过。
 
-## 浏览器验收
+### 浏览器验收
 
 在本地页面 `http://127.0.0.1:8765` 操作验证：
 

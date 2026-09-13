@@ -154,8 +154,8 @@
 
   function renderRoles(meeting = null) {
     if (!state.meta) return;
-    const includeReviewer = meeting ? meeting.include_reviewer : $("include-reviewer").checked;
-    const roles = state.meta.roles.filter((role) => includeReviewer || role.id !== "reviewer");
+    const roles = meeting?.include_reviewer === false
+      ? state.meta.roles.filter((role) => role.id !== "reviewer") : state.meta.roles;
     $("role-count").textContent = roles.length;
     const fragment = document.createDocumentFragment();
     for (const role of roles) {
@@ -365,7 +365,7 @@
       $("mode-badge").classList.toggle("real", !simulation);
       $("create-mode-hint").replaceChildren(element("span", "status-dot"), document.createTextNode(simulation ? "预设流程演示，不进行 AI 推理" : "通过 OpenClaw 调用各专业角色"));
       $("max-rounds").replaceChildren();
-      for (let number = 1; number <= meta.limits.max_rounds_max; number++) {
+      for (let number = meta.limits.max_rounds_min; number <= meta.limits.max_rounds_max; number++) {
         const option = element("option", "", `${number} 轮`); option.value = number; option.selected = number === meta.limits.max_rounds_default; $("max-rounds").append(option);
       }
       $("examples").replaceChildren(...meta.examples.map((example) => {
@@ -406,7 +406,7 @@
     state.creating = true; $("start-meeting").disabled = true; $("form-error").hidden = true;
     const version = state.selection;
     try {
-      const meeting = await api("/api/meetings", {method: "POST", body: {topic, constraints, max_rounds: Number($("max-rounds").value), include_reviewer: $("include-reviewer").checked}});
+      const meeting = await api("/api/meetings", {method: "POST", body: {topic, constraints, max_rounds: Number($("max-rounds").value)}});
       state.history = [meeting, ...state.history.filter((item) => item.id !== meeting.id)]; renderHistory();
       if (version === state.selection) { ++state.selection; state.selected = meeting.id; history.replaceState(null, "", `#meeting=${meeting.id}`); renderMeeting(meeting); renderHistory(); setTab("discussion"); }
     } catch (error) { $("form-error").textContent = error.message; $("form-error").hidden = false; }
@@ -422,7 +422,6 @@
   $("new-meeting").addEventListener("click", newMeeting);
   $("brand-home").addEventListener("click", newMeeting);
   $("topic").addEventListener("input", updateCount);
-  $("include-reviewer").addEventListener("change", () => renderRoles());
   $("open-settings").addEventListener("click", showSettings);
   $("mode-badge").addEventListener("click", showSettings);
   $("close-dialog").addEventListener("click", () => $("detail-dialog").close());

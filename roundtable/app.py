@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__
 from .config import Settings
 from .engine import QueueFullError, RoundtableEngine
-from .models import MeetingRequest
+from .models import DEFAULT_ROUNDS, MAX_ROUNDS, MIN_ROUNDS, MeetingRequest
 from .providers import create_provider
 from .reporting import render_report
 from .skills import ROLE_SPECS, SkillCatalog
@@ -117,7 +117,8 @@ def create_app(settings: Settings | None = None, provider=None) -> FastAPI:
         skills = request.app.state.catalog.all()
         return {"app_name": "UGC AI 圆桌", "version": __version__, "provider": config.provider_info(),
                 "roles": ROLE_SPECS, "examples": examples,
-                "limits": {"max_rounds_default": config.max_rounds_default, "max_rounds_max": config.max_rounds_max},
+                "limits": {"max_rounds_min": MIN_ROUNDS, "max_rounds_default": DEFAULT_ROUNDS,
+                           "max_rounds_max": MAX_ROUNDS},
                 "skills": [{key: item[key] for key in ("id", "name", "description")} for item in skills]}
 
     @app.get("/api/skills/{skill_id}")
