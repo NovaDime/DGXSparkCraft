@@ -1,5 +1,11 @@
 # 本地验收记录
 
+## Agent 工具默认拒绝分支验证 · 2026-09-13
+
+在 `feat/agent-tools-denied-by-default` 分支执行 `python -B -m unittest discover -s tests`：64 项通过。导出测试确认五个角色的工具策略均为 `profile: minimal` 且 `deny: ["*"]`；原有模型路由和敏感凭证不导出检查仍通过。
+
+这是部署片段的本地结构检查；没有在目标 OpenClaw 版本或 Spark 上验证实际工具拒绝效果，也没有执行 Agent 侧数值脚本。
+
 ## 严格双模型路由分支验证 · 2026-09-13
 
 在 `feat/strict-hybrid-model-routing` 分支执行 `python -B -m unittest discover -s tests`：64 项通过。导出测试确认策划固定云端模型引用、其余四个角色固定本地引用，主模型无回退且 `utilityModel` 使用同一路由；缺失、格式错误或同 provider 的模型引用会在写入部署包前被拒绝。

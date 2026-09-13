@@ -73,8 +73,8 @@ python scripts/verify_local.py
 python scripts/export_openclaw.py --target-root /home/your-user/ugc-roundtable --planner-model cloud-provider/planner-model-id --local-model spark-local/local-model-id
 ```
 
-上面的模型引用只是格式示例，部署前必须替换为实际 provider/model。生成 `build/openclaw/`：五个角色工作区、Skills、文件指纹和 `openclaw.fragment.json`。片段把策划固定到云端模型，其余四个角色固定到本地模型，均不配置回退。导出工具不会操作远程机器、安装框架或覆盖已有配置。
-将它部署到目标目录后，在专用 OpenClaw 配置中合并片段、分别配置云端和本地 provider 与工具权限，再启动圆桌服务。
+上面的模型引用只是格式示例，部署前必须替换为实际 provider/model。生成 `build/openclaw/`：五个角色工作区、Skills、文件指纹和 `openclaw.fragment.json`。片段把策划固定到云端模型，其余四个角色固定到本地模型，均不配置回退，并默认拒绝所有 Agent 工具。导出工具不会操作远程机器、安装框架或覆盖已有配置。
+将它部署到目标目录后，在专用 OpenClaw 配置中合并片段、分别配置云端和本地 provider、执行沙箱与网络策略，再启动圆桌服务。数值脚本默认不能由 Agent 执行；如需开放，须先完成目标版本与权限隔离验证。
 当前片段按 OpenClaw 官方 `agents.entries` 格式生成；provider 真实地址、密钥、网络权限和目标版本仍需在 Spark 上配置及校验。最终网页、调度器、OpenClaw 和本地模型都运行在同一台 Spark。具体见 [Spark 接入说明](docs/spark-connection.md)。
 
 ## 项目结构

@@ -32,6 +32,7 @@ class ExportTests(unittest.TestCase):
             expected = self.models["planner_model"] if agent_id == "planner" else self.models["local_model"]
             self.assertEqual(entry["model"], {"primary": expected, "fallbacks": []})
             self.assertEqual(entry["utilityModel"], expected)
+            self.assertEqual(entry["tools"], {"profile": "minimal", "deny": ["*"]})
         self.assertTrue(config["gateway"]["http"]["endpoints"]["responses"]["enabled"])
         self.assertTrue((output / "workspaces/host/skills/roundtable-host/SKILL.md").exists())
         for path in output.rglob("*"):

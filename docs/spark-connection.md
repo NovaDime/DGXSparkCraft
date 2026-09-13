@@ -15,13 +15,15 @@
    python scripts/export_openclaw.py --target-root /home/your-user/ugc-roundtable --planner-model cloud-provider/planner-model-id --local-model spark-local/local-model-id
    ```
 
-3. 将生成目录放到 Spark 专用目录，在目标 OpenClaw 的专用配置中合并 `openclaw.fragment.json`。该片段包含五个角色的工作区、Skill 可见性、固定主模型、同路由 `utilityModel`、空回退列表和 Responses 开关；不包含模型权重、provider 端点、认证或工具权限。已有同名 Agent 时先修改本地 Agent ID 再重新导出，避免混入其他项目会话。
+3. 将生成目录放到 Spark 专用目录，在目标 OpenClaw 的专用配置中合并 `openclaw.fragment.json`。该片段包含五个角色的工作区、Skill 可见性、固定主模型、同路由 `utilityModel`、空回退列表、全部 Agent 工具拒绝策略和 Responses 开关；不包含模型权重、provider 端点、认证或执行沙箱设置。已有同名 Agent 时先修改本地 Agent ID 再重新导出，避免混入其他项目会话。
 4. 依据目标 OpenClaw 版本校验配置。当前导出器使用 `agents.entries`；旧版若使用其他配置结构，按对应版本官方文档迁移。不要用片段覆盖完整配置。
-5. 分别配置云端和 Spark 本地 provider 的真实端点、认证与网络策略；确认策划只会访问指定云端 API，其余四个角色不能经 provider 回退访问外网。保留 Gateway 回环监听，配置认证与各角色工具权限。每个工作区只安装该角色的 Skill；需要计算或读取参考资料时确认 Python 与文件读取工具实际可用。Skill 的文字说明和可见性都不能替代执行沙箱。
+5. 分别配置云端和 Spark 本地 provider 的真实端点、认证与网络策略；确认策划只会访问指定云端 API，其余四个角色不能经 provider 回退访问外网。保留 Gateway 回环监听和认证。每个工作区只安装该角色的 Skill；本版导出片段默认拒绝所有 Agent 工具，数值脚本不在 Agent 中执行。若需开放脚本或文件读取，先在目标版本与 OpenShell 沙箱中单独验证权限，再明确修改策略。Skill 的文字说明和可见性都不能替代执行沙箱。
 
 模型引用不同只能防止继承同一默认模型，**不能证明** provider 端点确实分别位于云端和本机。策划收到的议题、约束和当前方案会离开 Spark；发送真实资料前必须确认云端服务的数据保留政策和脱敏边界。
 
 OpenClaw 的 `POST /v1/responses` 默认关闭，需要 `gateway.http.endpoints.responses.enabled=true`；它与 Gateway 共用端口。调用通过 `model: openclaw/<agentId>` 选择角色。[HTTP 接口说明](https://docs.openclaw.ai/gateway/openresponses-http-api)
+
+导出片段使用官方 [工具策略](https://docs.openclaw.ai/gateway/config-tools/tool-policy) 中的 per-agent `tools.profile` 和通配 `deny`。这仅是预期配置；目标版本仍须运行配置校验、逐角色拒绝测试和沙箱检查。
 
 ## 本地配置
 
