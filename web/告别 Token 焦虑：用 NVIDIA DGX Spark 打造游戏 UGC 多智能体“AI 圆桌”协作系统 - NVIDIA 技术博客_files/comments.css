@@ -1,0 +1,177 @@
+/* Optional CSS for fixing oneboxes and quotes. */
+
+aside.onebox {
+	border: 5px solid #e9e9e9;
+	margin-bottom: 1em;
+	padding: 12px 25px 12px 12px;
+	font-size: 1em;
+}
+
+aside.onebox .site-icon {
+	width: 16px;
+	height: 16px;
+	margin-right: 3px;
+}
+
+aside.onebox .onebox-body .onebox-avatar {
+	max-height: none;
+	max-width: none;
+	height: 60px;
+	width: 60px;
+	margin-right: 10px;
+	float: left;
+}
+
+.aspect-image {
+	max-width: 20%;
+	min-height: 60px;
+	max-height: 170px;
+	height: auto;
+	width: auto;
+	margin-right: 10px;
+	float: left;
+	clear: both;
+}
+
+.aspect-image:after {
+	content: "";
+	display: table;
+	clear: both;
+}
+
+aside.onebox .onebox-body img {
+	width: 100%;
+	height: auto;
+}
+
+aside.onebox header a[href] {
+	color: #919191;
+	text-decoration: none;
+}
+
+aside.onebox .onebox-body h3, aside.onebox .onebox-body h4 {
+	font-size: 1em;
+	max-width: calc(80% - 10px);
+	margin: 0 0 10px 0;
+	float: left;
+	clear: none;
+	padding-top: 0;
+}
+
+aside.onebox .onebox-body a[href] {
+	color: #08c;
+	text-decoration: none;
+}
+
+aside.onebox .onebox-body p,
+.onebox-body .tweet {
+	float: left;
+	max-width: calc(80% - 20px);
+	clear: none;
+}
+
+article.onebox-body:after {
+	content: "";
+	display: table;
+	clear: both;
+}
+
+/* Twitter. */
+.onebox-body .tweet, .onebox-body .tweet + .date {
+	float: left;
+}
+
+/* Quotes. */
+.comment-body .quote .title {
+	border-left: 5px solid #e9e9e9;
+	background-color: #f9f9f9;
+	color: #646464;
+	padding: 12px 12px 1px 12px;
+}
+
+.comment-body .quote blockquote {
+	border-left: 5px solid #e9e9e9;
+	background-color: #f9f9f9;
+	font-size: 1em;
+	padding: 12px 12px 12px 12px;
+    margin-top: 0;
+	margin-right: 0;
+	margin-bottom: 0;
+	margin-left: 0;
+	border-top: none;
+	border-right: none;
+	border-bottom: none;
+	clear: both;
+}
+
+.comment-body .quote blockquote p:last-child {
+	margin-bottom: 0;
+}
+
+.comment-body aside.quote .title .avatar {
+	margin-right: 7px;
+}
+
+.comment-body .quote .title a {
+	color: #08c;
+}
+
+.comment-body .quote .title a .badge-category {
+	color: #222;
+}
+
+.comment-body .comment-meta {
+	display: flex;
+	gap: 1em;
+}
+
+.comment-body .comment-author {
+	display: flex;
+	gap: 1em;
+}
+
+span.badge-category-bg {
+	width: 9px;
+	height: 9px;
+	display: inline-block;
+	margin-right: 5px;
+	margin-left: 5px;
+}
+
+
+/* Polls and Youtube links. */
+.wpdc-poll-link,
+.wpdc-onebox-link {
+	display: block;
+}
+
+/* Images. */
+.lightbox-wrapper .meta {
+	display: none;
+}
+
+.discourse-comments-area ol {
+	list-style: none;
+	padding: 0;
+}
+
+.discourse-comments-area .comment-reply-title {
+	text-align: left;
+}
+
+.discourse-comments-area .comment-reply-title .wpdc-discourse-topic-link {
+	margin-left: 0.25em;
+}
+
+.discourse-comments-area .comment-respond p:not(.comment-notes) {
+	max-width: none;
+}
+
+.block-editor-block-preview__content-iframe .comments-title-wrap,
+.block-editor-block-preview__content-iframe .comment-respond {
+	display: none;
+}
+.block-editor-block-preview__content-iframe .comment-body img.avatar {
+	width: 50px;
+	height: 50px;
+}

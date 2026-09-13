@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#141613">
+  <meta name="description" content="面向游戏 UGC 开发的多角色设计评审圆桌。">
+  <title>AI 圆桌 · 游戏创意，共同推敲</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c5e995'/%3E%3Cpath d='M8 8h6v6H8zm10 0h6v6h-6zM8 18h6v6H8zm10 0h6v6h-6z' fill='%23232b1b'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css?v=0.1.0">
+  <script src="/static/app.js?v=0.1.0" defer></script>
+</head>
+<body>
+  <svg class="icon-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M20 11.5a8 8 0 0 1-8 8H5l-3 2 1.4-5.2A8 8 0 1 1 20 11.5Z"/><path d="M7 9h8M7 13h5"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H5v18h14V8l-5-5Z"/><path d="M14 3v5h5M8 12h8M8 16h6"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16M8 4v6M16 14v6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="m12 3 9 5v9l-9 5-9-5V8l9-5ZM3 8l9 5 9-5M12 13v9M7.5 5.5l9 5"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/></symbol>
+  </svg>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="圆桌导航">
+      <a href="/" class="brand" id="brand-home" aria-label="AI 圆桌首页"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span><strong>AI 圆桌</strong><small>UGC ROUNDTABLE</small></span></a>
+      <button type="button" class="button button-primary new-meeting" id="new-meeting"><svg class="icon"><use href="#i-plus"/></svg>发起新圆桌<span class="keyboard-hint" aria-hidden="true">＋</span></button>
+      <div class="sidebar-section-heading"><span>会议记录</span><span class="count" id="history-count">0</span></div>
+      <nav class="history-list" id="history-list" aria-label="历史会议"><p class="sidebar-empty">正在读取会议记录…</p></nav>
+      <div class="sidebar-bottom"><div class="local-card"><span class="tiny-grid" aria-hidden="true"></span><div><strong>为本地协作而设计</strong><p>独立角色 · 共享模型 · 逐轮评审</p></div></div><button type="button" class="sidebar-settings" id="open-settings"><svg class="icon"><use href="#i-settings"/></svg>运行配置<svg class="icon small"><use href="#i-arrow"/></svg></button><p class="sidebar-footnote">从一个创意，到一份经过推敲的方案。</p></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar"><div class="breadcrumb"><span>工作空间</span><span class="breadcrumb-separator">/</span><strong id="breadcrumb-current">新建圆桌</strong></div><div class="topbar-status"><span class="connection-label" id="connection-label">正在连接</span><button type="button" class="mode-badge" id="mode-badge" aria-label="查看当前运行模式"><span class="status-dot"></span><span id="mode-label">读取配置</span><svg class="icon small"><use href="#i-info"/></svg></button></div></header>
+      <div class="notice" id="notice" role="status" aria-live="polite" hidden><span id="notice-text"></span><button type="button" id="notice-retry" class="text-button" hidden>重新连接</button><button type="button" id="dismiss-notice" class="icon-button" aria-label="关闭提示"><svg class="icon small"><use href="#i-close"/></svg></button></div>
+      <div class="content-grid">
+        <main class="main-content" id="main-content">
+          <section id="welcome-view" class="welcome-view" aria-labelledby="welcome-heading">
+            <div class="welcome-kicker"><span class="short-line"></span>让专业视角，坐到同一张桌前</div>
+            <div class="welcome-heading-row"><div><h1 id="welcome-heading">一个好想法，<br>值得<span>一起推敲。</span></h1><p class="welcome-description">把游戏创意带到圆桌。策划、数值与程序员逐轮讨论，<br class="desktop-break">由主管整理分歧，沉淀成可追溯的开发方案。</p></div><div class="table-illustration" aria-hidden="true"><div class="table-orbit"></div><div class="table-center"><svg class="icon"><use href="#i-box"/></svg></div><span class="table-seat seat-one">主</span><span class="table-seat seat-two">策</span><span class="table-seat seat-three">数</span><span class="table-seat seat-four">码</span><span class="table-seat seat-five">审</span><span class="orbit-pixel pixel-one"></span><span class="orbit-pixel pixel-two"></span></div></div>
+            <form id="meeting-form" class="meeting-form">
+              <div class="form-heading"><span class="section-number">01</span><h2>今天，讨论什么？</h2><span class="form-heading-note">从一个具体玩法开始</span></div>
+              <label for="topic" class="sr-only">圆桌议题</label><textarea id="topic" name="topic" rows="5" maxlength="4000" placeholder="例如：设计一个采集任务玩法。玩家收集指定物品后领取奖励，需要考虑多人联机、重复领奖和数值平衡。" required></textarea>
+              <div class="topic-meta"><span>描述目标、玩家体验，以及需要团队解决的问题</span><span id="topic-count">0 / 4000</span></div>
+              <div class="example-row"><span class="example-label">试试这些议题</span><div id="examples" class="example-buttons"></div></div>
+              <details class="constraints-details"><summary>补充约束与背景<span>选填</span></summary><label for="constraints" class="sr-only">补充约束与背景</label><textarea id="constraints" name="constraints" rows="3" maxlength="4000" placeholder="例如：面向网易《我的世界》基岩版 ModSDK；只使用已有游戏素材；单局时长控制在 10 分钟。"></textarea></details>
+              <div class="form-divider"></div>
+              <div class="meeting-options"><label class="round-option" for="max-rounds">最多讨论<select id="max-rounds" name="max_rounds" aria-label="最多讨论轮数"><option value="1">1 轮</option><option value="2">2 轮</option><option value="3" selected>3 轮</option><option value="4">4 轮</option><option value="5">5 轮</option></select></label><label class="switch-option"><input type="checkbox" id="include-reviewer" name="include_reviewer" checked><span class="switch-track" aria-hidden="true"></span><span>第二位程序员参与复核</span></label></div>
+              <div class="form-footer"><p id="create-mode-hint"><span class="status-dot"></span>正在读取运行模式</p><button type="submit" id="start-meeting" class="button button-primary" disabled>开始圆桌<svg class="icon"><use href="#i-arrow"/></svg></button></div><p class="form-error" id="form-error" role="alert" hidden></p>
+            </form>
+            <div class="process-strip" aria-label="圆桌流程"><div><span>01</span><strong>需求拆解</strong></div><i>→</i><div><span>02</span><strong>专业评审</strong></div><i>→</i><div><span>03</span><strong>分歧复议</strong></div><i>→</i><div><span>04</span><strong>方案汇总</strong></div></div><p class="welcome-footnote">保留每一轮观点与修改依据，让最终方案有迹可循。</p>
+          </section>
+          <section id="meeting-loading" class="panel-empty" role="status" hidden><h3>正在读取会议…</h3><p>加载已保存的方案与讨论记录。</p></section>
+          <section id="meeting-view" class="meeting-view" aria-labelledby="meeting-topic" hidden>
+            <div class="meeting-eyebrow"><span class="eyebrow">圆桌会议</span><span id="meeting-id" class="mono"></span><span id="meeting-mode" class="subtle-badge"></span></div><h1 id="meeting-topic" class="meeting-topic"></h1>
+            <details id="meeting-brief" class="meeting-brief" hidden><summary>查看完整议题</summary><p id="meeting-topic-full"></p></details>
+            <div class="meeting-summary-row"><div class="meeting-summary"><span class="session-status" id="meeting-status"></span><span id="meeting-round"></span><span id="meeting-turns"></span></div><button type="button" id="cancel-meeting" class="button button-quiet button-small" hidden><svg class="icon small"><use href="#i-stop"/></svg>停止讨论</button></div>
+            <p id="meeting-constraints" class="meeting-constraints" hidden></p><div id="meeting-alert" class="meeting-alert" role="status" hidden></div>
+            <div class="meeting-tabs" role="tablist" aria-label="会议内容"><button type="button" class="tab active" id="discussion-tab" role="tab" aria-selected="true" aria-controls="discussion-panel" tabindex="0">讨论记录<span id="turn-tab-count" class="tab-count">0</span></button><button type="button" class="tab" id="proposal-tab" role="tab" aria-selected="false" aria-controls="proposal-panel" tabindex="-1">方案与总结<span class="report-ready-dot" id="report-ready-dot" hidden></span></button><span class="meeting-tabs-tail" id="live-indicator"><span class="status-dot"></span>记录自动保存</span></div>
+            <div id="discussion-panel" role="tabpanel" aria-labelledby="discussion-tab"><div id="timeline" class="timeline"></div><div id="active-turn" class="active-turn" hidden><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="active-turn-text"></span></div><div id="timeline-empty" class="panel-empty"><svg class="icon"><use href="#i-chat"/></svg><h3>大家正在入席</h3><p>主管将整理议题，随后开始逐轮评审。</p></div><details class="event-log" id="event-log"><summary>查看运行记录<span id="event-count">0</span></summary><ol id="events"></ol></details></div>
+            <div id="proposal-panel" role="tabpanel" aria-labelledby="proposal-tab" hidden><div class="report-heading"><div><span class="eyebrow">ROUNDTABLE OUTPUT</span><h2 id="report-title">当前方案</h2></div><div class="export-buttons"><a id="export-md" class="button button-quiet button-small" download><svg class="icon small"><use href="#i-download"/></svg>Markdown</a><a id="export-json" class="button button-quiet button-small" download>JSON</a></div></div><div id="report-warning" class="report-warning" hidden></div><article id="report-content" class="markdown-body"></article><div id="report-empty" class="panel-empty"><svg class="icon"><use href="#i-file"/></svg><h3>方案正在讨论中</h3><p>主管整理的方案和最终总结会显示在这里。</p></div></div>
+          </section>
+        </main>
+        <aside class="inspector" aria-label="角色与评审状态">
+          <section class="inspector-section"><div class="inspector-heading"><h2>圆桌成员</h2><span id="role-count" class="count">5</span></div><p class="inspector-description">各司其职，共同审视同一个创意。</p><div id="roles" class="roles"></div><p class="role-hint"><span class="status-dot"></span>轮流发言 · 独立角色上下文</p></section>
+          <section class="inspector-section issues-section" id="issues-section" hidden><div class="inspector-heading"><h2>待解决分歧</h2><span id="issue-count" class="count">0</span></div><div id="issues" class="issues"></div><details id="resolved-issues-details" class="resolved-issues" hidden><summary id="resolved-issues-summary">已处理分歧</summary><div id="resolved-issues-list"></div></details></section>
+          <section class="inspector-section output-section" id="output-section" hidden><div class="inspector-heading"><h2>会议产出</h2><svg class="icon small"><use href="#i-file"/></svg></div><p id="output-description">讨论中的方案将持续更新。</p><button type="button" id="view-report" class="button button-quiet output-button">查看方案与总结<svg class="icon small"><use href="#i-arrow"/></svg></button><div class="session-metrics" id="session-metrics"></div></section>
+          <section class="inspector-section principles-section" id="principles-section"><span class="eyebrow">讨论如何推进</span><h3>有分歧，再讨论。<br>有共识，再落笔。</h3><p>角色提出观点与质疑，主管追踪问题并整理修订。达到轮数上限时，保留仍需人工判断的问题。</p><div class="principle-tags"><span>专业 Skills</span><span>多轮评审</span><span>完整记录</span></div></section>
+          <div class="inspector-footer"><span class="tiny-grid" aria-hidden="true"></span><span>SPARK READY<span class="inspector-footer-line">本地开发，按需接入模型</span></span></div>
+        </aside>
+      </div>
+    </div>
+  </div>
+  <dialog id="detail-dialog" aria-labelledby="dialog-title"><div class="dialog-header"><div><span class="eyebrow" id="dialog-eyebrow">SKILL DETAIL</span><h2 id="dialog-title">专业技能</h2></div><button type="button" class="icon-button" id="close-dialog" aria-label="关闭窗口"><svg class="icon"><use href="#i-close"/></svg></button></div><div id="dialog-content" class="dialog-content"></div></dialog><div class="sr-only" id="screen-reader-status" role="status" aria-live="polite"></div>
+</body>
+</html>
