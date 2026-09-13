@@ -1,5 +1,9 @@
 # 本地验收记录
 
+## 会议轮询同毫秒更新修复 · 2026-09-13
+
+在 `fix/meeting-poll-version-check` 分支执行 `python -B -m unittest discover -s tests`：65 项通过；`node --check roundtable/static/app.js` 通过。新增测试证明多条事件即使拥有相同毫秒时间戳，事件 ID 仍按序递增。页面现在同时比较时间、事件数量、发言数量和状态，不再只依赖毫秒时间戳判断是否需要刷新。未进行新版浏览器手动验收。
+
 ## Agent 工具默认拒绝分支验证 · 2026-09-13
 
 在 `feat/agent-tools-denied-by-default` 分支执行 `python -B -m unittest discover -s tests`：64 项通过。导出测试确认五个角色的工具策略均为 `profile: minimal` 且 `deny: ["*"]`；原有模型路由和敏感凭证不导出检查仍通过。

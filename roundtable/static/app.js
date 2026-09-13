@@ -385,7 +385,10 @@
       const id = state.selected; const version = state.selection; state.detailBusy = true;
       try {
         const meeting = await api(`/api/meetings/${id}`);
-        if (id === state.selected && version === state.selection && meeting.updated_at !== state.meeting?.updated_at) renderMeeting(meeting);
+        const previous = state.meeting;
+        if (id === state.selected && version === state.selection &&
+            (meeting.updated_at !== previous?.updated_at || meeting.events.length !== previous?.events.length ||
+             meeting.turns.length !== previous?.turns.length || meeting.status !== previous?.status)) renderMeeting(meeting);
       } catch (error) { if (id === state.selected) notice(error.message, true); }
       finally { state.detailBusy = false; }
     }

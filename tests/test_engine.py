@@ -4,6 +4,7 @@ import asyncio
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from roundtable.config import Settings
 from roundtable.engine import QueueFullError, RoundtableEngine
@@ -91,6 +92,14 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(meeting["metrics"]["input_tokens"])
         self.assertIn("规则模拟", meeting["final_report"])
         self.assertTrue(all(turn["skill_sha256"] for turn in meeting["turns"]))
+
+    async def test_event_ids_advance_even_when_timestamps_collide(self):
+        with patch("roundtable.engine.now", return_value="2026-09-13T00:00:00.000+00:00"):
+            meeting = await self.run_meeting(ScriptedProvider())
+        self.assertEqual(meeting["status"], "completed")
+        self.assertEqual(len({event["created_at"] for event in meeting["events"]}), 1)
+        self.assertEqual([event["id"] for event in meeting["events"]],
+                         list(range(1, len(meeting["events"]) + 1)))
 
     async def test_fourth_round_when_third_round_raises_issue(self):
         def behavior(role, context):
