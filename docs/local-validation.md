@@ -1,5 +1,11 @@
 # 本地验收记录
 
+## 严格双模型路由分支验证 · 2026-09-13
+
+在 `feat/strict-hybrid-model-routing` 分支执行 `python -B -m unittest discover -s tests`：64 项通过。导出测试确认策划固定云端模型引用、其余四个角色固定本地引用，主模型无回退且 `utilityModel` 使用同一路由；缺失、格式错误或同 provider 的模型引用会在写入部署包前被拒绝。
+
+这是本地配置生成和校验结果，不是 OpenClaw 目标版本配置验收。云端 API、Spark 本地模型服务、网络隔离及真实角色调用尚未联调。
+
 ## 五角色、3 至 4 轮分支验证 · 2026-09-13
 
 在 `feat/five-agent-three-four-rounds` 分支执行 `python -B -m unittest discover -s tests -v`：63 项通过。覆盖新会议固定五角色、至少三轮后才能收敛、第三轮新增问题时进入第四轮、第四轮仍有分歧时待复核，以及 API 和页面限制。
