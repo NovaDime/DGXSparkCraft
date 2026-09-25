@@ -13,6 +13,7 @@
 - 新会议只能选择 3 或 4 轮上限；第 3 轮前不会提前判定收敛。
 - 规则模拟与 OpenClaw 两种后端。默认是**规则模拟**，用于验证流程，不是 AI 推理。
 - OpenClaw HTTP 适配器、角色工作区导出工具和未来 Spark 接入说明；实际 Spark 尚未联调。
+- Spark 连接要求、运维辅助 Skill、机器可读 Skill Card、离线配置 dry-run 与真机验收模板；不接入美术工具。
 - 每轮专家评审同一版方案。分歧由提出者复核关闭；主持修改过的方案需要重新评审。
 
 本系统交付设计评审建议，不自动生成完整模组。没有把静态检查、模型自报或模拟数据标成游戏验收。
@@ -77,11 +78,15 @@ python scripts/export_openclaw.py --target-root /home/your-user/ugc-roundtable -
 将它部署到目标目录后，在专用 OpenClaw 配置中合并片段、分别配置云端和本地 provider、执行沙箱与网络策略，再启动圆桌服务。数值脚本默认不能由 Agent 执行；如需开放，须先完成目标版本与权限隔离验证。
 当前片段按 OpenClaw 官方 `agents.entries` 格式生成；provider 真实地址、密钥、网络权限和目标版本仍需在 Spark 上配置及校验。最终网页、调度器、OpenClaw 和本地模型都运行在同一台 Spark。具体见 [Spark 接入说明](docs/spark-connection.md)。
 
+按黑客松截图补充的 [Spark 连接与 Skill 交付要求](docs/spark-connection-requirements.md) 明确了 SSH 管理、暂存配置、目标版本校验、分层验收与签名记录。先把配置模板复制到 `artifacts/spark/generated.env`，填写非秘密连接参数；给上述导出命令增加 `--env-file artifacts/spark/generated.env --dry-run` 可只输出本地部署计划，不创建部署产物或访问网络。去掉 `--dry-run` 后生成的部署包包含 `deployment-plan.json` 和五个角色的 `SKILL_CARD.json`；文件清单是哈希校验材料，不是数字签名。
+
+运维人员可参考 [spark-connect Skill](skills/spark-connect/SKILL.md)；它不参与会议，不增加第六个角色。截图中的 VSS、双 Spark、30081 和模型名不作为本项目的固定要求。真实连接、性能、签名及人工接受尚待实际执行。
+
 ## 项目结构
 
 ```text
 roundtable/          Python 引擎、模型接口、存储、API 与轻量网页
-skills/              五个角色的专业 Skills、参考资料和数值工具
+skills/              五个角色 Skills、数值工具、Skill Card 与 Spark 运维 Skill
 examples/            三个可评审议题
 scripts/             本地验证、OpenClaw 工作区导出
 tests/               自动化回归测试

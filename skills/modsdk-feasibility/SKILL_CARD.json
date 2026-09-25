@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "skill_id": "modsdk-feasibility",
+  "version": "0.1.0",
+  "description": "Review technical feasibility against the selected Minecraft China Bedrock ModSDK runtime and APIs.",
+  "use_cases": [
+    "Check runtime constraints and client/server responsibilities."
+  ],
+  "owner": {
+    "project": "spark-game",
+    "responsible_person": null,
+    "contact": null,
+    "status": "pending"
+  },
+  "license": {
+    "status": "not_declared",
+    "spdx_id": null,
+    "redistribution": "requires_owner_confirmation"
+  },
+  "deployment_geography": {
+    "status": "pending",
+    "allowed_regions": [],
+    "cloud_data": "Local review material may be included in the cloud planner's later context."
+  },
+  "requirements": {
+    "role": "engineer",
+    "meeting_participant": true,
+    "model_route": "spark_local",
+    "tool_permissions": "deny_all_by_default",
+    "credentials": "Gateway-managed provider authentication; never supplied in meeting context.",
+    "credential_values_in_card": false
+  },
+  "dependencies": [
+    "spark-game roundtable engine",
+    "OpenClaw target version",
+    "chosen Spark local model service"
+  ],
+  "risks_and_mitigations": [
+    {
+      "risk": "Unsupported API or Python runtime assumptions can produce an infeasible proposal.",
+      "mitigation": "Require target SDK evidence and preserve unknowns; Python service tests do not prove game compatibility."
+    }
+  ],
+  "references": [
+    "SKILL.md",
+    "references/sdk-evidence.md"
+  ],
+  "ethical_considerations": [
+    "No art integration or asset generation.",
+    "Do not claim model opinions are game test results.",
+    "Use only meeting material permitted for the configured cloud data boundary."
+  ],
+  "trust": {
+    "scan": {
+      "status": "not_run",
+      "evidence": null
+    },
+    "evaluation": {
+      "status": "not_run",
+      "evidence": null
+    },
+    "signature": {
+      "status": "unsigned",
+      "evidence": null
+    },
+    "acceptance": {
+      "status": "pending",
+      "evidence": null
+    },
+    "duplication": {
+      "status": "not_checked",
+      "evidence": null
+    }
+  }
+}

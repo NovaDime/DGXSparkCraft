@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "skill_id": "minecraft-design",
+  "version": "0.1.0",
+  "description": "Review Minecraft UGC player experience, gameplay rules, triggers and completion conditions.",
+  "use_cases": [
+    "Cloud planner review of a bounded gameplay proposal."
+  ],
+  "owner": {
+    "project": "spark-game",
+    "responsible_person": null,
+    "contact": null,
+    "status": "pending"
+  },
+  "license": {
+    "status": "not_declared",
+    "spdx_id": null,
+    "redistribution": "requires_owner_confirmation"
+  },
+  "deployment_geography": {
+    "status": "pending",
+    "allowed_regions": [],
+    "cloud_data": "Topic, constraints, proposal and selected review context are sent to the planner provider."
+  },
+  "requirements": {
+    "role": "planner",
+    "meeting_participant": true,
+    "model_route": "cloud_planner",
+    "tool_permissions": "deny_all_by_default",
+    "credentials": "Gateway-managed provider authentication; never supplied in meeting context.",
+    "credential_values_in_card": false
+  },
+  "dependencies": [
+    "spark-game roundtable engine",
+    "OpenClaw target version",
+    "chosen cloud planner API"
+  ],
+  "risks_and_mitigations": [
+    {
+      "risk": "Meeting inputs and proposal context leave Spark for the cloud planner API.",
+      "mitigation": "Confirm allowed data and provider geography before real calls; keep credentials out of meeting context."
+    }
+  ],
+  "references": [
+    "SKILL.md"
+  ],
+  "ethical_considerations": [
+    "No art integration or asset generation.",
+    "Do not claim model opinions are game test results.",
+    "Use only meeting material permitted for the configured cloud data boundary."
+  ],
+  "trust": {
+    "scan": {
+      "status": "not_run",
+      "evidence": null
+    },
+    "evaluation": {
+      "status": "not_run",
+      "evidence": null
+    },
+    "signature": {
+      "status": "unsigned",
+      "evidence": null
+    },
+    "acceptance": {
+      "status": "pending",
+      "evidence": null
+    },
+    "duplication": {
+      "status": "not_checked",
+      "evidence": null
+    }
+  }
+}

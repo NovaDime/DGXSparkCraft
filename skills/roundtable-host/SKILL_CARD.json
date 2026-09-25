@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "skill_id": "roundtable-host",
+  "version": "0.1.0",
+  "description": "Organize a bounded Minecraft UGC design review and synthesize a version for independent specialist review.",
+  "use_cases": [
+    "Meeting opening, issue summaries and proposal revisions."
+  ],
+  "owner": {
+    "project": "spark-game",
+    "responsible_person": null,
+    "contact": null,
+    "status": "pending"
+  },
+  "license": {
+    "status": "not_declared",
+    "spdx_id": null,
+    "redistribution": "requires_owner_confirmation"
+  },
+  "deployment_geography": {
+    "status": "pending",
+    "allowed_regions": [],
+    "cloud_data": "Local review material may be included in the cloud planner's later context."
+  },
+  "requirements": {
+    "role": "host",
+    "meeting_participant": true,
+    "model_route": "spark_local",
+    "tool_permissions": "deny_all_by_default",
+    "credentials": "Gateway-managed provider authentication; never supplied in meeting context.",
+    "credential_values_in_card": false
+  },
+  "dependencies": [
+    "spark-game roundtable engine",
+    "OpenClaw target version",
+    "chosen Spark local model service"
+  ],
+  "risks_and_mitigations": [
+    {
+      "risk": "A host can claim consensus or close another specialist's issue without evidence.",
+      "mitigation": "Python enforces same-version approval, owner-only issue closure and the three-to-four-round limit."
+    }
+  ],
+  "references": [
+    "SKILL.md"
+  ],
+  "ethical_considerations": [
+    "No art integration or asset generation.",
+    "Do not claim model opinions are game test results.",
+    "Use only meeting material permitted for the configured cloud data boundary."
+  ],
+  "trust": {
+    "scan": {
+      "status": "not_run",
+      "evidence": null
+    },
+    "evaluation": {
+      "status": "not_run",
+      "evidence": null
+    },
+    "signature": {
+      "status": "unsigned",
+      "evidence": null
+    },
+    "acceptance": {
+      "status": "pending",
+      "evidence": null
+    },
+    "duplication": {
+      "status": "not_checked",
+      "evidence": null
+    }
+  }
+}

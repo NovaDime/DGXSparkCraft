@@ -1,5 +1,16 @@
 # 本地验收记录
 
+## Spark 连接要求与部署 dry-run · 2026-09-25
+
+分支 `feat/spark-connection-requirements`，在当前 Windows Python 3.11.15 环境执行：
+
+- `python -B -m unittest tests.test_export -v`：10 项通过。新增场景覆盖 dry-run 不写输出、不联网、与实际导出计划一致，暂存配置与环境变量优先级，缺失显式配置失败，假 Token 不输出，以及五角色卡片复制和完整文件清单校验。
+- `python -B -m unittest discover -s tests -v`：70 项通过，包括会议引擎、API、provider、数值工具和 Windows 服务管理回归。服务测试使用临时数据和测试端口。
+- skill-creator 的 `quick_validate.py`：`spark-connect` 通过格式检查。检查 6 张 Skill Card 的必填字段及引用、12 个验收场景的 JSON 和唯一 ID、19 个本地 Markdown 链接，均有效。
+- `git diff --check`：无空白错误；Git 提示本机换行转换，不影响本次检查。
+
+新增的 `evals/evals.json` 与 `BENCHMARK.md` 保持未执行的验收模板，以上单元测试记录不替代真实 Agent 对 Skill 的效果评估。没有连接 Spark、调用真实模型、安装或修改 OpenClaw，也没有执行签名、外部扫描或人工接受。导出计划明确保留 `installed=false`、真机项 `not_run` 和 `signature=unsigned`。
+
 ## 会议轮询同毫秒更新修复 · 2026-09-13
 
 在 `fix/meeting-poll-version-check` 分支执行 `python -B -m unittest discover -s tests`：65 项通过；`node --check roundtable/static/app.js` 通过。新增测试证明多条事件即使拥有相同毫秒时间戳，事件 ID 仍按序递增。页面现在同时比较时间、事件数量、发言数量和状态，不再只依赖毫秒时间戳判断是否需要刷新。未进行新版浏览器手动验收。

@@ -18,6 +18,8 @@
 
 视频时长与提交格式按实际比赛要求确定。准备材料时另保留软件提交版本、Skill 文件指纹、目标 OpenClaw 版本、模型配置及运行日期。
 
+按新增的 [Spark 连接与 Skill 交付要求](spark-connection-requirements.md)，随附每个 Skill 的 `SKILL_CARD.json`、配置预检计划、评测场景与实际验收记录。可从 [BENCHMARK 模板](../skills/spark-connect/BENCHMARK.md) 建立报告。卡片、哈希清单、扫描结果、效果评估、数字签名与人工接受分别说明；未签名或未测项目保持相应状态，不把截图中示例的认证与性能写成项目结果。本次不包含美术连接演示。
+
 ## 验收分别记录
 
 | 层级 | 需要记录的内容 | 能说明的结果 |

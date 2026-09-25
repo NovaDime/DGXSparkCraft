@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from roundtable.config import Settings
+from roundtable.models import MIN_ROUNDS, MAX_ROUNDS
 from roundtable.skills import ROLE_SPECS, SkillCatalog
 
 
@@ -23,7 +24,8 @@ def _model_ref(value: str | None, label: str) -> str:
 
 
 def export_bundle(output: Path, target_root: str, settings: Settings | None = None,
-                  *, planner_model: str | None = None, local_model: str | None = None) -> dict:
+                  *, planner_model: str | None = None, local_model: str | None = None,
+                  dry_run: bool = False) -> dict:
     planner_model = _model_ref(planner_model, "策划云端模型")
     local_model = _model_ref(local_model, "Spark 本地模型")
     if planner_model.split("/", 1)[0] == local_model.split("/", 1)[0]:
@@ -47,6 +49,28 @@ def export_bundle(output: Path, target_root: str, settings: Settings | None = No
         for path in source.rglob("*"):
             if not path.resolve().is_relative_to(source.resolve()):
                 raise ValueError("技能目录包含越界链接，导出已停止")
+        agent_id = settings.agent_ids[role["id"]]
+        model = planner_model if role["id"] == "planner" else local_model
+        entries[agent_id] = {"workspace": str(remote / "workspaces" / agent_id),
+                             "skills": [role["skill_id"]], "model": {"primary": model, "fallbacks": []},
+                             "utilityModel": model, "tools": {"profile": "minimal", "deny": ["*"]}}
+    plan = {
+        "schema_version": 1, "target_root": str(remote), "agents": entries,
+        "scope": {"spark_count": 1, "min_rounds": MIN_ROUNDS, "max_rounds": MAX_ROUNDS,
+                  "art_integration": False},
+        "roundtable": {"provider_mode": settings.provider_mode,
+                       "gateway_url": settings.openclaw_base_url,
+                       "request_timeout_seconds": settings.request_timeout_seconds,
+                       "max_context_chars": settings.max_context_chars,
+                       "max_output_tokens": settings.max_output_tokens},
+        "validation": {"local_config": "passed", "target_config": "not_run",
+                       "gateway": "not_run", "role_inference": "not_run",
+                       "tool_denial": "not_run", "spark_benchmark": "not_run",
+                       "signature": "unsigned"},
+        "network_contacted": False, "installed": False,
+    }
+    if dry_run:
+        return {"output": str(output), "dry_run": True, **plan}
     output.mkdir(parents=True, exist_ok=True)
     for role in ROLE_SPECS:
         agent_id = settings.agent_ids[role["id"]]
@@ -66,18 +90,13 @@ def export_bundle(output: Path, target_root: str, settings: Settings | None = No
             "默认不提供任何工具调用权限；角色说明本身不授予额外权限。\n"
         )
         (workspace / "AGENTS.md").write_text(instructions, encoding="utf-8")
-        model = planner_model if role["id"] == "planner" else local_model
-        entries[agent_id] = {"workspace": str(remote / "workspaces" / agent_id),
-                             "skills": [role["skill_id"]], "model": {"primary": model, "fallbacks": []},
-                             "utilityModel": model, "tools": {"profile": "minimal", "deny": ["*"]}}
         for path in workspace.rglob("*"):
             if path.is_file():
                 manifest[path.relative_to(output).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
     fragment = {"gateway": {"http": {"endpoints": {"responses": {"enabled": True}}}},
                 "agents": {"ownership": "explicit", "entries": entries}}
     (output / "openclaw.fragment.json").write_text(json.dumps(fragment, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    manifest["openclaw.fragment.json"] = hashlib.sha256((output / "openclaw.fragment.json").read_bytes()).hexdigest()
-    (output / "manifest.json").write_text(json.dumps({"format": 1, "files": manifest}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (output / "deployment-plan.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (output / "INSTALL.md").write_text(
         "# OpenClaw 圆桌部署包\n\n"
         "此包仅导出配置片段和角色工作区，没有安装或修改任何 OpenClaw 服务。\n\n"
@@ -93,10 +112,19 @@ def export_bundle(output: Path, target_root: str, settings: Settings | None = No
         "Skills 可见性不是文件访问控制。数值工具只有在执行权限和 Python 运行时可用后才可使用。\n\n"
         "在 Spark 上先确认五个 Agent 可分别调用，并在角色工作区验证 Skills 可见，"
         "再将本项目 ROUNDTABLE_PROVIDER 切换为 openclaw。GET /v1/models 只检查连通；"
-        "还需核对每个角色的真实模型路由和实际调用日志。\n",
+        "还需核对每个角色的真实模型路由和实际调用日志。\n\n"
+        "deployment-plan.json 是本地配置预检结果，目标配置校验、真实调用与性能测试均未执行。"
+        "manifest.json 记录文件 SHA-256，不是数字签名；当前包未签名。"
+        "每个角色工作区随附源 Skill 中的 SKILL_CARD.json（如果存在），"
+        "发布前核对责任人、许可、部署地域、验收记录与签名。"
+        "连接要求见项目 docs/spark-connection-requirements.md。\n",
         encoding="utf-8",
     )
-    return {"output": str(output), "agents": list(entries), "files": len(manifest), "installed": False}
+    for name in ("openclaw.fragment.json", "deployment-plan.json", "INSTALL.md"):
+        manifest[name] = hashlib.sha256((output / name).read_bytes()).hexdigest()
+    (output / "manifest.json").write_text(json.dumps({"format": 1, "files": manifest}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {"output": str(output), "agents": list(entries), "files": len(manifest),
+            "installed": False, "dry_run": False}
 
 
 def main():
@@ -108,10 +136,15 @@ def main():
     parser.add_argument("--target-root", required=True, help="未来 Spark 部署目录，例如 /home/<user>/ugc-roundtable")
     parser.add_argument("--planner-model", required=True, help="策划云端模型引用，例如 cloud-provider/model-id")
     parser.add_argument("--local-model", required=True, help="其余四角色的 Spark 本地模型引用，例如 spark-local/model-id")
+    parser.add_argument("--dry-run", action="store_true", help="仅校验并输出不含密钥的部署计划；不写文件、不连接设备")
+    parser.add_argument("--env-file", type=Path, help="读取暂存环境配置；操作系统环境变量仍优先")
     args = parser.parse_args()
     try:
-        result = export_bundle(args.output, args.target_root, planner_model=args.planner_model,
-                               local_model=args.local_model)
+        if args.env_file is not None and not args.env_file.is_file():
+            raise ValueError("指定的暂存环境配置不存在或不是文件")
+        settings = Settings.from_env(args.env_file) if args.env_file is not None else None
+        result = export_bundle(args.output, args.target_root, settings, planner_model=args.planner_model,
+                               local_model=args.local_model, dry_run=args.dry_run)
     except (ValueError, OSError) as exc:
         parser.exit(2, f"导出失败：{exc}\n")
     print(json.dumps(result, ensure_ascii=False, indent=2))

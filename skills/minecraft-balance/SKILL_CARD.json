@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "skill_id": "minecraft-balance",
+  "version": "0.1.0",
+  "description": "Review rewards, probabilities, cooldowns and progression with explicit mathematical assumptions.",
+  "use_cases": [
+    "Numeric review and reproducible estimates."
+  ],
+  "owner": {
+    "project": "spark-game",
+    "responsible_person": null,
+    "contact": null,
+    "status": "pending"
+  },
+  "license": {
+    "status": "not_declared",
+    "spdx_id": null,
+    "redistribution": "requires_owner_confirmation"
+  },
+  "deployment_geography": {
+    "status": "pending",
+    "allowed_regions": [],
+    "cloud_data": "Local review material may be included in the cloud planner's later context."
+  },
+  "requirements": {
+    "role": "balance",
+    "meeting_participant": true,
+    "model_route": "spark_local",
+    "tool_permissions": "deny_all_by_default",
+    "credentials": "Gateway-managed provider authentication; never supplied in meeting context.",
+    "credential_values_in_card": false
+  },
+  "dependencies": [
+    "spark-game roundtable engine",
+    "OpenClaw target version",
+    "chosen Spark local model service"
+  ],
+  "risks_and_mitigations": [
+    {
+      "risk": "Estimated numbers or an unexecuted calculation script can be mistaken for game measurements.",
+      "mitigation": "Label assumptions and formulas; tools are denied by default; record real output only when a separately authorized script has run."
+    }
+  ],
+  "references": [
+    "SKILL.md",
+    "references/calculation-tool.md",
+    "scripts/analyze_balance.py"
+  ],
+  "ethical_considerations": [
+    "No art integration or asset generation.",
+    "Do not claim model opinions are game test results.",
+    "Use only meeting material permitted for the configured cloud data boundary."
+  ],
+  "trust": {
+    "scan": {
+      "status": "not_run",
+      "evidence": null
+    },
+    "evaluation": {
+      "status": "not_run",
+      "evidence": null
+    },
+    "signature": {
+      "status": "unsigned",
+      "evidence": null
+    },
+    "acceptance": {
+      "status": "pending",
+      "evidence": null
+    },
+    "duplication": {
+      "status": "not_checked",
+      "evidence": null
+    }
+  }
+}

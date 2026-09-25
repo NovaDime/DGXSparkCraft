@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "skill_id": "spark-connect",
+  "version": "0.1.0",
+  "description": "Prepare single-DGX-Spark connectivity, staged configuration and acceptance evidence for spark-game.",
+  "use_cases": ["operator preflight", "offline deployment dry-run", "real-device acceptance recording"],
+  "owner": {"project": "spark-game", "responsible_person": null, "contact": null, "status": "pending"},
+  "license": {"status": "not_declared", "spdx_id": null, "redistribution": "requires_owner_confirmation"},
+  "deployment_geography": {"status": "pending", "allowed_regions": [], "cloud_data": "Planner traffic requires provider region and data-policy review."},
+  "requirements": {"role": "deployment_operator", "meeting_participant": false, "credentials": ["SSH authentication", "OPENCLAW_TOKEN", "planner provider credential"], "credential_values_in_card": false, "tool_permissions": "Operator-scoped access; no permissions granted to meeting agents."},
+  "dependencies": ["spark-game repository including scripts/export_openclaw.py", "project Python requirements", "OpenClaw target version", "one DGX Spark", "chosen local model service", "chosen cloud planner API", "SSH client when remotely administered"],
+  "risks_and_mitigations": [
+    {"risk": "Screenshot parameters mistaken for actual deployment values", "mitigation": "Collect SP-01 through SP-08; do not assume port, model or second machine."},
+    {"risk": "Overwriting live configuration or exposing credentials", "mitigation": "Stage generated.env, use dry-run and empty bundle directories, inject secrets on target."},
+    {"risk": "Local checks mistaken for successful deployment", "mitigation": "Record target checks as not_run until actual evidence is available."}
+  ],
+  "references": ["SKILL.md", "references/connect.md", "references/prepare.md", "references/acceptance.md", "evals/evals.json", "BENCHMARK.md"],
+  "ethical_considerations": ["No art integration or asset generation.", "Do not transmit private meeting material without an agreed cloud-data boundary.", "Do not fabricate benchmark, signature or human acceptance evidence."],
+  "trust": {"scan": {"status": "not_run", "evidence": null}, "evaluation": {"status": "not_run", "evidence": null}, "signature": {"status": "unsigned", "evidence": null}, "acceptance": {"status": "pending", "evidence": null}, "duplication": {"status": "not_checked", "evidence": null}}
+}
