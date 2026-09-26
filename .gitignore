@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 .venv/
 __pycache__/
 *.py[cod]
@@ -8,3 +10,10 @@ dist/
 .coverage
 artifacts/
 *.egg-info/
+
+# Local archives, generated launchers and portable runtimes
+web/
+.runtime/
+*.desktop
+.pytest_cache/
+*.zip

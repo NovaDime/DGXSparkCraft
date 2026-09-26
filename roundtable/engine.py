@@ -9,7 +9,7 @@ from uuid import uuid4
 from pydantic import ValidationError
 
 from .config import Settings
-from .models import AgentResult, MIN_ROUNDS, MeetingRequest, TERMINAL_STATUSES
+from .models import AgentResult, MIN_ROUNDS, MAX_MEETING_TOKENS, MeetingRequest, TERMINAL_STATUSES
 from .reporting import render_report
 from .skills import SkillCatalog
 from .storage import MeetingStore
@@ -58,6 +58,8 @@ class RoundtableEngine:
             "turns": [], "issues": [], "events": [], "active_role_id": None,
             "metrics": {"turn_count": 0, "total_elapsed_ms": 0, "input_tokens": None, "output_tokens": None},
             "schema_version": 1,
+            "token_budget": MAX_MEETING_TOKENS, "budget_tokens": 0,
+            "model_routes": self.model_routes.snapshot() if hasattr(self, "model_routes") else {},
         }
         self._event(meeting, "queued", "已加入圆桌队列；每次仅运行一场会议。")
         self._states[meeting["id"]] = meeting
@@ -135,6 +137,7 @@ class RoundtableEngine:
 
     async def _turn(self, meeting: dict, role_id: str, phase: str, reviews: list[dict], all_approve: bool = False) -> AgentResult:
         role = self.catalog.role(role_id, self.settings.agent_ids)
+        role["model_ref"] = meeting.get("model_routes", {}).get(role_id)
         meeting["active_role_id"] = role_id
         self._event(meeting, "turn_started", f"{role['name']}开始{'整理议题' if phase == 'opening' else '汇总讨论' if phase == 'synthesis' else '评审'}。",
                     role_id=role_id, round=meeting["current_round"])
@@ -142,15 +145,21 @@ class RoundtableEngine:
             "meeting_id": meeting["id"], "round": meeting["current_round"], "phase": phase,
             "topic": meeting["topic"], "constraints": meeting["constraints"], "proposal": meeting["proposal"],
             "issues": [{key: item[key] for key in ("id", "owner_role_id", "title", "detail", "severity", "status")}
-                       for item in meeting["issues"] if item["status"] == "open"],
-            "round_reviews": reviews,
-            "previous_summary": next((turn["summary"] for turn in reversed(meeting["turns"]) if turn["role_id"] == "host"), ""),
+                       for item in meeting["issues"] if item["status"] == "open" and (phase == "synthesis" or item["owner_role_id"] == role_id)],
+            "round_reviews": reviews if phase == "synthesis" else [],
+            "own_open_issues": [item for item in meeting["issues"] if item["status"] == "open" and item["owner_role_id"] == role_id],
+            "review_goal": "先核对自己已有问题是否被当前方案解决，解决则明确关闭；只提出本职责范围内阻碍方案成立的问题，后续实测放入建议。",
+            "previous_summary": next((turn["summary"] for turn in reversed(meeting["turns"]) if turn["role_id"] == "host"), "") if phase == "synthesis" else "",
+            "remaining_token_budget": meeting.get("token_budget", MAX_MEETING_TOKENS) - meeting.get("budget_tokens", 0),
             "all_approve": all_approve,
         }
+        if getattr(self, "official_knowledge", None):
+            context["official_knowledge"] = self.official_knowledge.context(meeting["topic"])
         started = time.perf_counter()
         async with asyncio.timeout(self.settings.request_timeout_seconds + 5):
             raw = await self.provider.generate(role=role, context=context)
         result = AgentResult.model_validate(raw)
+        meeting["budget_tokens"] = meeting.get("budget_tokens", 0) + result.budget_tokens
         elapsed_ms = round((time.perf_counter() - started) * 1000)
         turn = {
             "id": len(meeting["turns"]) + 1, "round": meeting["current_round"], "role_id": role_id,
@@ -158,6 +167,7 @@ class RoundtableEngine:
             "provided_skill_id": role["skill_id"], "skill_sha256": role["skill_sha256"],
             "reference_sha256": role["reference_sha256"],
             "elapsed_ms": elapsed_ms, "created_at": now(),
+            "model_ref": role.get("model_ref"),
         }
         meeting["turns"].append(turn)
         meeting["metrics"]["turn_count"] = len(meeting["turns"])
@@ -186,7 +196,7 @@ class RoundtableEngine:
                     raise ValueError("主持者没有提供可供评审的初始方案。")
                 meeting["proposal"] = opening.proposal
                 self.store.save(meeting)
-                specialists = ["planner", "balance", "engineer", "reviewer"]
+                specialists = ["planner", "balance", "engineer", "audio", "reviewer"]
                 for round_index in range(1, meeting["max_rounds"] + 1):
                     meeting["current_round"] = round_index
                     reviewed_proposal = meeting["proposal"]
@@ -225,6 +235,10 @@ class RoundtableEngine:
             from .providers import ProviderError
             if isinstance(exc, ProviderError):
                 message = str(exc)
+                if exc.code == "token_budget":
+                    meeting["budget_tokens"] = min(MAX_MEETING_TOKENS, meeting.get("budget_tokens", 0) + getattr(exc, "budget_tokens", 0))
+                    self._finish(meeting, "needs_review", message)
+                    return
             elif isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
                 message = "本次角色调用超时，会议已停止。请检查模型服务并调整请求超时。"
             elif isinstance(exc, ValidationError):

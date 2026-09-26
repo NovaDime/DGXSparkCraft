@@ -16,6 +16,17 @@
 
 ## 证据等级
 
+## 2026-09-25 可读快照补充
+
+官方入口 [API 文档](https://mc.163.com/dev/apidocs.html) 与 [开发指南](https://mc.163.com/dev/guide.html) 在本次环境中无法读取正文；因此不能宣称已复核最新文档。可读补充是 MCNeteaseDevs 技术手册快照 `4a9b3f90ccb7ab0c631815d004f07a9e4f64c950`，目标项目版本仍未知：
+
+- [System.md](https://github.com/MCNeteaseDevs/mc-netease-sdk/blob/4a9b3f90ccb7ab0c631815d004f07a9e4f64c950/1-ModAPI/接口/通用/System.md)：`RegisterSystem(nameSpace, systemName, clsPath)` 有服务端和客户端各自模块；`GetServerSystemCls` 与 `GetClientSystemCls` 分属对应端，不能混用。
+- [事件.md](https://github.com/MCNeteaseDevs/mc-netease-sdk/blob/4a9b3f90ccb7ab0c631815d004f07a9e4f64c950/1-ModAPI/接口/通用/事件.md)：已读取 `ListenForEvent`、`UnListenForEvent` 的订阅/取消订阅参数。具体事件回调字段仍需逐事件核对，不能从名称推断。
+
+这些条目只支持对应符号的快照声明，不能证明物品奖励、存档或某个完整玩法在目标环境可运行。
+
+## 证据等级与关闭范围
+
 | 材料 | 可以支持 | 不能单独支持 |
 |---|---|---|
 | 目标版本 API 文档 | 接口存在、声明的参数和端别 | 组合玩法运行成功 |

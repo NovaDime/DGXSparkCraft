@@ -9,6 +9,7 @@ ROLE_SPECS = [
     {"id": "planner", "name": "策划虾", "title": "玩法策划", "description": "审阅玩家体验、玩法规则与边界情况。", "skill_id": "minecraft-design"},
     {"id": "balance", "name": "数值虾", "title": "数值评审", "description": "检查奖励、概率、成长与经济循环的合理性。", "skill_id": "minecraft-balance"},
     {"id": "engineer", "name": "程序虾皮", "title": "技术可行性", "description": "依据目标 ModSDK 评估实现路径和约束。", "skill_id": "modsdk-feasibility"},
+    {"id": "audio", "name": "调音虾尾", "title": "配音与交互音效", "description": "设计 NPC 对白、物品与交互音效，复核声音资源和触发规则。", "skill_id": "minecraft-audio"},
     {"id": "reviewer", "name": "程序虾米", "title": "独立逻辑审查", "description": "质疑重复触发、状态同步与异常处理设计。", "skill_id": "modsdk-review"},
 ]
 
@@ -18,7 +19,7 @@ class SkillCatalog:
         self.root = root.resolve()
 
     def get(self, skill_id: str) -> dict:
-        if skill_id not in {role["skill_id"] for role in ROLE_SPECS}:
+        if skill_id not in {role["skill_id"] for role in ROLE_SPECS} | {"modsdk-coding", "repository-learning"}:
             raise KeyError(skill_id)
         folder = (self.root / skill_id).resolve()
         if not folder.is_relative_to(self.root):

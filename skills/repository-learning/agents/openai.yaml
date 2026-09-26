@@ -1,0 +1,4 @@
+interface:
+  display_name: "代码库学习与经验复用"
+  short_description: "检索本地仓库并沉淀带来源、可采纳和撤销的项目开发经验"
+  default_prompt: "使用 $repository-learning 从当前导入仓库提取与开发任务有关的模式，并保存有证据的候选经验。"

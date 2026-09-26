@@ -1,107 +1,73 @@
-# Minecraft UGC · AI 圆桌
+# SparkCraft 1.0 · 助力开发你想要的世界
 
-面向网易《我的世界》中国版基岩 ModSDK 的本地多角色设计评审系统。
-按照两篇项目博客的同一套圆桌思路，从空项目重新实现；未使用旧项目源码。
+用 NVIDIA DGX Spark 打造游戏 UGC 多智能体“AI 圆桌”协作系统。
 
-主管 → 策划 → 数值 → 程序可行性 → 程序逻辑审查 → 主管，围绕分歧进行多轮讨论，最终导出方案和会议记录。
-固定 5 个角色，没有美术 Agent；每场会议至少评审 3 轮，最多 4 轮。助手虾的信息收集模块留在后续。
+**NVIDIA DGX Spark 黑客松 · NVIDIA Developer社区说的都队**
 
-## 当前可用范围
+面向 Minecraft 中国版开发。六位圆桌成员分别负责主持、策划、数值、技术可行性、音效与独立审查；程序虾仁负责代码制作。会议形成方案后，由人审核任务单，再自动下发编码和音效任务，检查后生成附加包 ZIP。当前默认目标为中国版基岩 1.24，最终兼容性仍须目标游戏验收。
 
-- Python 圆桌调度、角色技能、逐轮方案、分歧台账、SQLite 持久化、网页查看与 Markdown / JSON 导出。
-- 全局单任务推理队列、手动停止、超时与轮次上限、服务中断记录恢复。
-- 新会议只能选择 3 或 4 轮上限；第 3 轮前不会提前判定收敛。
-- 规则模拟与 OpenClaw 两种后端。默认是**规则模拟**，用于验证流程，不是 AI 推理。
-- OpenClaw HTTP 适配器、角色工作区导出工具和未来 Spark 接入说明；实际 Spark 尚未联调。
-- Spark 连接要求、运维辅助 Skill、机器可读 Skill Card、离线配置 dry-run 与真机验收模板；不接入美术工具。
-- 每轮专家评审同一版方案。分歧由提出者复核关闭；主持修改过的方案需要重新评审。
 
-本系统交付设计评审建议，不自动生成完整模组。没有把静态检查、模型自报或模拟数据标成游戏验收。
+## DGX Spark 快速开始
 
-## 本地启动
+Ubuntu / Linux ARM64，Python 3.12+；模型部署需要已配置 NVIDIA 容器运行环境的 Docker。首次需要网络下载 Python 依赖、Node、OpenClaw、模型权重及容器，不是包含模型的离线整机镜像。
 
-详细功能、技术实现、完整目录及文件放置说明见 [项目说明与使用手册](项目说明与使用手册.md)。
-
-Windows 日常使用可以直接双击项目根目录的 `启动圆桌.cmd`、`彻底关闭圆桌.cmd`、`查看日志和状态.cmd`。启动脚本会在后台运行服务，日志查看脚本持续显示状态变化和新日志；关闭脚本保留数据库与日志。首次运行仍需准备下面的 Python 依赖。
-
-需要 Python 3.11 或以上，主程序与游戏内 ModSDK 的 Python 环境分开。
-
-```powershell
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m roundtable
+```bash
+chmod +x *.sh
+./一键部署.sh --dry-run   # 查看部署动作，不修改环境
+./一键部署.sh            # 准备依赖，复用或部署 Nemotron，启动并打开工作台
 ```
 
-打开 <http://127.0.0.1:8765>。默认无需模型、密钥或联网。页面资源均在项目内，不加载外部 CDN。
-如果当前 Python 已有依赖，直接运行 `python -m roundtable`。
+已有 `.venv`、OpenClaw 和本机模型的用户直接运行：
 
-Linux / Spark 上使用 `.venv/bin/python`，其余命令相同。启动时使用单 worker；重复服务会被数据目录锁拒绝。
-需要更换端口时运行 `python -m roundtable --port 8766`。
-
-## 本地验证
-
-```powershell
-python -m unittest discover -s tests -v
-python scripts/verify_local.py
+```bash
+./启动.sh               # 启动或复用服务，自动打开默认浏览器 /studio
+./后台监控.sh           # 后台健康记录
+./结束.sh               # 只结束本项目 Studio、Gateway 与监控
+./安装桌面快捷方式.sh    # 为当前位置生成可双击的启动、部署图标
 ```
 
-测试包含固定方案评审、角色顺序、分歧关闭权限、假共识阻止、重新评审、取消与排队、中断恢复、HTTP 合约、响应验证和凭证脱敏。
-第二条命令生成 `artifacts/local-verification/` 下的模拟会议记录和检查摘要。它不会连接 Spark。
-已执行的自动化与浏览器验收见 [本地验收记录](docs/local-validation.md)。
+Linux 文件管理器可能将 `.sh` 双击解释为打开文本。安装桌面快捷方式后，双击 **SparkCraft 创作工作室**；若桌面提示“允许启动”，按系统提示启用。搬动目录后重新生成快捷方式。无图形界面时启动脚本会打印访问地址。
 
-## 接入 OpenClaw / Spark
+新版入口：[http://127.0.0.1:8765/studio](http://127.0.0.1:8765/studio)。详细前提、固定版本与下载说明见 [DGX Spark 部署](docs/DGX-Spark部署.md)。部署检测到已有模型/GPU任务时不会将其停止或替换。默认模型端口 8000、项目 Gateway 19789、Studio 8765，均仅本机访问。
 
-复制 `.env.example` 为 `.env`，按实际服务填写配置；环境变量优先于 `.env`。不要把 `.env` 提交或放入演示材料。
+## 使用流程
 
-| 配置 | 作用 |
-| --- | --- |
-| `ROUNDTABLE_PROVIDER` | `simulation`（默认）或 `openclaw` |
-| `OPENCLAW_BASE_URL` | OpenClaw Gateway 地址，默认 `http://127.0.0.1:18789` |
-| `OPENCLAW_TOKEN` | Gateway 认证凭证，只由 Python 服务使用 |
-| `OPENCLAW_AGENT_*` | 五个专业角色对应的 OpenClaw Agent ID |
-| `ROUNDTABLE_REQUEST_TIMEOUT` | 单角色调用超时，默认 180 秒 |
-| `ROUNDTABLE_MAX_CONTEXT_CHARS` | 请求上下文字符预算，默认 24000；这不是 token 数 |
-| `ROUNDTABLE_MAX_OUTPUT_TOKENS` | 单角色输出 token 预算，默认 4096；网关尽力限制，不完整回复会拒绝采用 |
-| `ROUNDTABLE_DATA_DIR` | 会议数据库目录，默认 `data/` |
+1. **代码库与知识 → 我的世界**：官方 API 与开发指南是默认前置资料，不需要选择代码库才进入 Agent 上下文。卡片区分基础规则、参考快照与官网正文；可刷新资料或上传离线文档。其他游戏显示“未来更新”。
+2. 可选上传代码库 ZIP 或导入本机目录，检索引用片段；原目录不被覆盖。文档识别模型支持本地模型与自配云端 API。
+3. **协作圆桌**：填写议题、约束及讨论上限，点像素虾查看/更换模型。讨论最多 1000 轮且受 1M 累计 token 预算保护；未解决分歧不会伪装成共识。
+4. 形成共识后整理任务单，由用户审核并批准，再执行程序和音效制作。StepAudio 默认 `stepaudio-3-gen-preview`，使用自己的 StepFun API Key。
+5. 在工作台或 VS Code 审阅代码、检查证据、下载包。需要目标游戏实测的结果不会标记为已验证。
 
-模型后端在 OpenClaw 中配置。此项目的 `OPENCLAW_MODEL=openclaw` 表示 Gateway 路由入口，不是 Spark 上的模型权重名称。
-真实连接失败会停止并保留会议，**不会自动回退模拟**。
-连通性检查仅验证 Gateway 的模型列表接口；五个角色和 Skills 仍需分别运行确认。
+任务、会议记录可移入回收站并恢复；运行中先停止。会议记录可折叠。经验沉淀采用索引与人工采纳，**不会训练或更改模型权重**。
 
-先生成可审阅的角色部署包（路径改成你们 Spark 的实际目录）：
+## 官方基础资料
 
-```powershell
-python scripts/export_openclaw.py --target-root /home/your-user/ugc-roundtable --planner-model cloud-provider/planner-model-id --local-model spark-local/local-model-id
-```
+- [中国版官方 API](https://mc.163.com/dev/apidocs.html)
+- [中国版官方开发指南](https://mc.163.com/dev/guide.html)
 
-上面的模型引用只是格式示例，部署前必须替换为实际 provider/model。生成 `build/openclaw/`：五个角色工作区、Skills、文件指纹和 `openclaw.fragment.json`。片段把策划固定到云端模型，其余四个角色固定到本地模型，均不配置回退，并默认拒绝所有 Agent 工具。导出工具不会操作远程机器、安装框架或覆盖已有配置。
-将它部署到目标目录后，在专用 OpenClaw 配置中合并片段、分别配置云端和本地 provider、执行沙箱与网络策略，再启动圆桌服务。数值脚本默认不能由 Agent 执行；如需开放，须先完成目标版本与权限隔离验证。
-当前片段按 OpenClaw 官方 `agents.entries` 格式生成；provider 真实地址、密钥、网络权限和目标版本仍需在 Spark 上配置及校验。最终网页、调度器、OpenClaw 和本地模型都运行在同一台 Spark。具体见 [Spark 接入说明](docs/spark-connection.md)。
+内置 `knowledge/minecraft/` 为本项目整理的导航和核验规则。启动首次尝试同步，正文仅存本机 `data/official-knowledge/`。官网不可访问时，API 可回退到固定提交的 MCNeteaseDevs 文档参考快照，界面明确标记。指南全文未获取时保持“正文尚未索引”。Agent 必须核对具体接口与目标 SDK，不能从首页链接推断接口签名。
 
-按黑客松截图补充的 [Spark 连接与 Skill 交付要求](docs/spark-connection-requirements.md) 明确了 SSH 管理、暂存配置、目标版本校验、分层验收与签名记录。先把配置模板复制到 `artifacts/spark/generated.env`，填写非秘密连接参数；给上述导出命令增加 `--env-file artifacts/spark/generated.env --dry-run` 可只输出本地部署计划，不创建部署产物或访问网络。去掉 `--dry-run` 后生成的部署包包含 `deployment-plan.json` 和五个角色的 `SKILL_CARD.json`；文件清单是哈希校验材料，不是数字签名。
-
-运维人员可参考 [spark-connect Skill](skills/spark-connect/SKILL.md)；它不参与会议，不增加第六个角色。截图中的 VSS、双 Spark、30081 和模型名不作为本项目的固定要求。真实连接、性能、签名及人工接受尚待实际执行。
-
-## 项目结构
+## 目录与发布
 
 ```text
-roundtable/          Python 引擎、模型接口、存储、API 与轻量网页
-skills/              五个角色 Skills、数值工具、Skill Card 与 Spark 运维 Skill
-examples/            三个可评审议题
-scripts/             本地验证、OpenClaw 工作区导出
-tests/               自动化回归测试
-docs/                架构、Spark 接入和比赛演示说明
-web/                 原始网页存档（保留不变）
+roundtable/          后端与新版工作台界面
+skills/              圆桌、编码、音效与知识技能
+knowledge/minecraft/ 默认官方资料导航与开发核验规则
+scripts/             启动、部署、桌面入口、发布打包工具
+docs/                使用、架构与验证说明
+examples/            可导入的最小示例
+tests/               自动测试
+compat/windows/      历史 Windows 入口，仅兼容保留
 ```
 
-每次发言保存其本地 Skill 内容指纹。`skill_ids` 是模型自报引用，不能单凭该字段认定执行了外部工具。
-OpenClaw Agent 的工作区与执行权限在目标服务中配置；Skill 文本本身不是权限隔离。
+`.env`、`data/`、`.venv/`、`.runtime/`、历史网页存档及动态桌面入口不进入发布包。API 密钥保存在 `data/private/`；会议、用户代码与模型配置都属于本机数据。
 
-## 开发依据与验收边界
+```bash
+.venv/bin/python -m unittest discover -s tests -q
+.venv/bin/python scripts/package_release.py --output ../V1.0便携版
+```
 
-- [NVIDIA AI 圆桌博客](https://developer.nvidia.cn/blog/spark-ugc-ai-roundtable/)：多专业角色轮流评审、由主管组织再讨论。
-- [OpenClaw Skills](https://docs.openclaw.ai/tools/skills)：`SKILL.md`、角色工作区与技能可见性。
-- [OpenClaw OpenResponses](https://docs.openclaw.ai/gateway/openresponses-http-api)：通过 `/v1/responses` 调用真实 Agent。
-- [网易开发者 ModSDK 资料](https://github.com/MCNeteaseDevs/modsdk_mcp_server)：游戏脚本版本按实际 SDK 核对；不能用主程序 Python 3 的检查代替游戏引擎测试。
+便携版可移动源码，在目标机按上述步骤准备依赖；不携带作者的模型权重、凭证或用户数据。发布脚本拒绝覆盖已有目录。
 
-当前本地测试不提供真实模型完成率、Spark 内存/性能或游戏兼容性证明。接入 Spark 后按 [演示与验收说明](docs/competition-demo.md) 记录真实结果。
+[人工审核与交付](docs/approved-delivery.md) · [资料功能与限制](docs/document-library-beta.md) · [开发说明](docs/minecraft-development.md)
+

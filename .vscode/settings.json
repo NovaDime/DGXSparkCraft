@@ -1,0 +1,1 @@
+{"python.defaultInterpreterPath":"${workspaceFolder}/.venv/bin/python","files.encoding":"utf8","files.exclude":{"**/__pycache__":true},"search.exclude":{"data/**":true,"web/**":true,".venv/**":true}}

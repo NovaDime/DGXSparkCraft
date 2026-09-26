@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark"><meta name="theme-color" content="#101410">
+  <meta name="description" content="面向 Minecraft 中国版开发的多 Agent 工作台：需求、代码、评审与本地知识积累。">
+  <title>SparkCraft · Agent 开发工作台</title>
+  <link rel="icon" type="image/svg+xml" href="/static/sparkcraft-logo.svg">
+  <link rel="stylesheet" href="/static/studio.css?v=2"><link rel="stylesheet" href="/static/studio-roundtable.css?v=2"><script src="/static/studio.js?v=2" defer></script><script src="/static/studio-roundtable.js?v=2" defer></script>
+  <link rel="stylesheet" href="/static/office.css?v=1">
+  <link rel="stylesheet" href="/static/world.css?v=1"><script src="/static/world.js?v=1" defer></script>
+  <link rel="stylesheet" href="/static/delivery.css?v=1"><script src="/static/delivery.js?v=1" defer></script>
+<script src="/static/documents.js?v=1" defer></script>
+</head>
+<body>
+  <dialog id="world-opening" class="world-opening" aria-labelledby="opening-title"><button id="opening-skip" class="opening-skip" type="button">进入工作台 ↗</button><div class="opening-stars" aria-hidden="true"></div><div class="opening-content"><div class="opening-emblem craft-opening" aria-hidden="true"><img src="/static/sparkcraft-logo.svg" width="112" height="112" alt=""></div><span class="opening-eyebrow">IMAGINE · CRAFT · CREATE</span><h1 id="opening-title">SparkCraft-助力开发你想要的世界</h1><p>用 NVIDIA DGX Spark 打造游戏 UGC 多智能体“AI 圆桌”协作系统</p><div class="opening-progress" aria-hidden="true"><i></i></div><small>你的创意，即将成为一个世界。</small></div><div class="opening-land" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><footer><span>NVIDIA DGX spark 黑客松</span><strong>NVIDIA Developer社区<span class="opening-team">说的都队</span></strong></footer></dialog>
+  <a class="skip-link" href="#main">跳转至工作区</a>
+  <div class="studio-shell">
+    <aside class="sidebar" aria-label="工作台导航">
+      <a class="brand" href="/studio" aria-label="SparkCraft 开发工作台"><img class="craft-logo" src="/static/sparkcraft-logo.svg" width="46" height="46" alt=""><span><strong>SparkCraft<span class="brand-period">.</span></strong><small>BUILD WORLDS · WITH SPARK</small></span></a>
+      <div class="space-label"><span class="status-dot"></span> Minecraft 中国版开发空间</div>
+      <nav class="primary-nav" aria-label="主要功能">
+        <button id="nav-development" class="nav-item active" type="button" aria-current="page"><span class="nav-symbol" aria-hidden="true">⌘</span>开发工作台<span class="nav-arrow" aria-hidden="true">↗</span></button>
+        <button id="nav-knowledge" class="nav-item" type="button"><span class="nav-symbol" aria-hidden="true">▧</span>代码库与知识<span id="repo-count" class="count">0</span></button>
+        <button id="nav-roundtable" type="button" class="nav-item"><span class="nav-symbol" aria-hidden="true">◉</span>协作圆桌<span class="count">6</span></button>
+      </nav>
+      <div class="history-heading"><span>开发任务</span><button id="new-job" type="button" class="icon-button" aria-label="新建开发任务" title="新建开发任务">＋</button></div>
+      <button id="job-trash" class="text-button" type="button">回收站</button><nav id="job-list" class="job-list" aria-label="开发任务记录"><p class="empty-small">正在读取任务…</p></nav>
+      <div class="sidebar-footer team-signature" aria-label="NVIDIA Developer社区说的都队"><div class="team-kicker" aria-hidden="true"><span></span> THE TEAM / 2026</div><div class="team-name"><span class="team-developer">NVIDIA Developer</span><span class="team-community">社区</span><strong class="team-title">说的都队<span class="team-pixel" aria-hidden="true"></span></strong></div><div class="team-baseline" aria-hidden="true">DGX SPARK HACKATHON <i></i></div></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar"><div class="breadcrumbs"><span>工作空间</span><span>/</span><strong id="page-name">开发工作台</strong></div><div id="provider-badge" class="provider-badge"><span class="status-dot"></span><select id="job-picker" aria-label="任务记录"><option value="">任务记录</option></select><span id="provider-label">连接本地服务…</span></div></header>
+      <div id="notice" class="notice" role="status" aria-live="polite" hidden><span id="notice-text"></span><button id="notice-close" type="button" class="icon-button" aria-label="关闭提示">×</button></div>
+      <main id="main" class="content">
+        <section id="development-view" aria-labelledby="development-title">
+          <div class="section-intro"><div><div class="eyebrow"><span></span> FROM IDEA TO ADD-ON</div><h1 id="development-title">让想法，<em>成为代码。</em></h1><p>圆桌共创方案，Agent 协作开发，在 VS Code 继续打磨。</p></div><div class="voxel" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+          <div class="workflow" aria-label="开发流程"><div><b>01</b><span>理解需求<small>方案与本地上下文</small></span></div><span class="flow-arrow" aria-hidden="true">→</span><div><b>02</b><span>协作编写<small>开发与静态检查</small></span></div><span class="flow-arrow" aria-hidden="true">→</span><div><b>03</b><span>评审改进<small>修复与经验回流</small></span></div></div>
+          <div class="development-grid">
+            <div class="development-main">
+              <form id="job-form" class="panel task-panel">
+                <div class="panel-title"><div><span class="section-number">01 / BRIEF</span><h2>这次，构建什么？</h2></div><span class="subtle-label">ModSDK 开发</span></div>
+                <label class="sr-only" for="task">开发需求</label><textarea id="task" rows="5" maxlength="6000" placeholder="例如：开发一个矿石采集进度组件。监听方块破坏事件，累计玩家采集数量，通过自定义 UI 展示进度；生成服务端逻辑、客户端通信和接入说明。" required></textarea>
+                <div class="field-note"><span>写清功能、触发条件与预期行为，Agent 会结合已有代码开展工作。</span><span id="task-count">0 / 6000</span></div>
+                <div class="form-grid"><label for="job-repository">参考代码库<select id="job-repository"><option value="">不使用本地代码库</option></select></label><label for="job-meeting">关联圆桌方案<select id="job-meeting"><option value="">直接从需求开始</option></select></label></div>
+                <details class="advanced"><summary>开发选项<span id="runtime-summary">Python 2.7 · 最多修复 1 次</span></summary><div class="form-grid"><label for="runtime">ModSDK Python 运行时<select id="runtime"><option value="python2">Python 2.7（兼容项目）</option><option value="python3">Python 3（项目明确支持时）</option></select></label><label for="max-repairs">评审后自动修复<select id="max-repairs"><option value="0">不自动修复</option><option value="1" selected>最多 1 次</option><option value="2">最多 2 次</option></select></label></div><p class="muted">请按目标中国版客户端与已有工程选择运行时。静态检查不等于游戏内验收。</p></details>
+                <div class="form-footer"><p id="mode-hint"><span class="status-dot"></span>读取运行模式后即可开始</p><button id="create-job" class="button primary" type="submit" disabled>开始开发 <span aria-hidden="true">↗</span></button></div><p id="job-form-error" class="form-error" role="alert" hidden></p>
+              </form>
+              <section id="job-output" class="panel output-panel" aria-labelledby="output-title" hidden>
+                <div class="panel-title"><div><span class="section-number">02 / WORKSPACE</span><h2 id="output-title">开发产出</h2></div><span id="job-status" class="pill">等待开始</span></div>
+                <div id="job-mode-warning" class="inline-warning" hidden></div><h3 id="job-task" class="job-task"></h3><div id="job-meta" class="job-meta"></div><p id="job-error" class="form-error" role="alert" hidden></p>
+                <div class="job-actions"><button id="review-learning" type="button" class="button secondary small" hidden>审阅学习候选</button><a id="download-job" class="button secondary small" download hidden>↓ 下载工程 ZIP</a><button id="open-vscode" type="button" class="button secondary small" hidden>在 VS Code 中打开 ↗</button><button id="cancel-job" type="button" class="button danger small" hidden>停止任务</button></div>
+                <div class="output-tabs" role="tablist" aria-label="开发产出"><button class="output-tab active" id="tab-code" type="button" role="tab" aria-selected="true" aria-controls="panel-code" tabindex="0">生成文件 <span id="file-count">0</span></button><button class="output-tab" id="tab-review" type="button" role="tab" aria-selected="false" aria-controls="panel-review" tabindex="-1">检查与评审 <span id="check-count">0</span></button><button class="output-tab" id="tab-events" type="button" role="tab" aria-selected="false" aria-controls="panel-events" tabindex="-1">运行记录 <span id="event-count">0</span></button></div>
+                <div id="panel-code" role="tabpanel" aria-labelledby="tab-code"><div id="code-empty" class="empty-state"><span aria-hidden="true">⌘</span><h3>等待第一份代码</h3><p>生成文件会在这里显示，可预览后下载或交给 VS Code。</p></div><div id="code-browser" class="code-browser" hidden><nav id="file-list" class="file-list" aria-label="生成文件列表"></nav><div class="code-body"><div class="code-toolbar"><span id="current-file"></span><button id="copy-code" type="button" class="text-button">复制代码</button></div><pre id="code-preview" tabindex="0" aria-label="生成文件内容"><code id="code-content"></code></pre></div></div></div>
+                <div id="panel-review" role="tabpanel" aria-labelledby="tab-review" hidden><div id="review-summary" class="review-summary"></div><ul id="review-issues" class="check-list"></ul><h3 class="minor-heading">静态检查</h3><ul id="checks" class="check-list"></ul></div>
+                <div id="panel-events" role="tabpanel" aria-labelledby="tab-events" hidden><ol id="event-list" class="event-list"></ol></div>
+              </section>
+            </div>
+            <aside class="context-column" aria-label="开发上下文">
+              <section class="context-card"><div class="context-title"><span class="small-icon" aria-hidden="true">▧</span><h2>让 Agent 了解你的工程</h2></div><p>导入本地代码库，检索已有结构、接口用法与被采纳的经验。</p><div id="context-repository" class="context-repository">尚未选择参考代码库</div><button id="manage-repositories" class="button secondary full" type="button">管理代码库 <span aria-hidden="true">↗</span></button><div class="context-divider"></div><div class="context-title"><span class="small-icon" aria-hidden="true">◎</span><h2>每一步，都有依据</h2></div><ul class="capability-list"><li><span>需求规划</span><small>结合圆桌与代码上下文</small></li><li><span>代码开发</span><small>面向中国版 ModSDK</small></li><li><span>独立评审</span><small>检查问题，有限次数修复</small></li><li><span>经验回流</span><small>人工采纳后进入后续检索</small></li></ul></section>
+              <section class="source-card"><span class="eyebrow">DEVELOPMENT REFERENCES</span><a href="https://mc.163.com/dev/apidocs.html" target="_blank" rel="noopener noreferrer">中国版官方 API 文档 <span aria-hidden="true">↗</span></a><a href="https://mc.163.com/dev/guide.html" target="_blank" rel="noopener noreferrer">中国版开发指南 <span aria-hidden="true">↗</span></a><p>聚焦需求、实现、检查与迭代。API 的具体签名以目标版本官方文档为准。</p></section>
+            </aside>
+          </div>
+        </section>
+        <section id="roundtable-view" aria-labelledby="roundtable-title" hidden>
+          <div class="section-intro"><div><div class="eyebrow"><span></span> SIX MINDS. ONE CREATION.</div><h1 id="roundtable-title">让创意，<em>在圆桌成形。</em></h1><p>从玩法逻辑到角色声音，六位专业伙伴共同推敲你的下一个模组。</p></div><div class="rt-orbit" aria-hidden="true">✳<small>SPARKCRAFT<br>COLLECTIVE</small></div></div>
+          <section class="shrimp-office" aria-label="虾米办公室"><div class="office-top"><div><span class="office-light"></span> SPARKCRAFT LAB <small>创意协作事务所</small></div><span id="office-status">点击伙伴，查看模型与职责</span></div><div class="office-window" aria-hidden="true"><i></i><i></i><i></i></div><div class="office-wall-label" aria-hidden="true">BUILD SOMETHING<br><b>WORTH PLAYING.</b></div><div id="rt-roles" class="rt-roles" aria-label="圆桌成员"></div><div class="office-bottom"><span>◈ 六个视角，一份共同打磨的方案</span><span>DESIGN · CODE · SOUND</span></div></section>
+          <dialog id="agent-dialog" class="agent-dialog"><form method="dialog"><button class="dialog-close" aria-label="关闭角色详情">×</button></form><div id="agent-portrait" class="agent-portrait" aria-hidden="true"></div><span class="eyebrow">MEET YOUR TEAMMATE</span><h2 id="agent-name"></h2><p id="agent-description"></p><div class="agent-model-current"><small>当前配置的文本模型</small><strong id="agent-current"></strong></div><form id="agent-model-form"><label for="agent-model">切换模型</label><select id="agent-model"></select><p class="field-help">更改仅作用于新会议。音频生成模型与圆桌文本模型分开配置。本地模型从 OpenClaw 读取；云端模型可在下方接入。</p><button class="button primary" id="agent-save">保存角色模型 ↗</button><p id="agent-message" role="status"></p></form></dialog>
+          <div class="rt-layout"><div>
+            <form id="rt-form" class="panel"><div class="panel-title"><div><span class="section-number">01 / THE BRIEF</span><h2>把一个好点子带到桌前</h2></div><span class="pill">六人协作</span></div>
+              <label for="rt-topic">圆桌议题</label><textarea id="rt-topic" rows="4" minlength="4" maxlength="4000" placeholder="例如：设计一位矿洞向导 NPC，讨论交互逻辑、对白风格与开启宝箱的音效。" required></textarea>
+              <label for="rt-constraints">约束与背景 <span class="optional">选填</span></label><textarea id="rt-constraints" rows="2" maxlength="4000" placeholder="目标版本、已有代码、声音风格，以及本次不讨论的范围…"></textarea>
+              <div class="form-footer"><label for="rt-rounds">最多讨论<input id="rt-rounds" type="number" min="3" max="1000" value="3" step="1" required aria-describedby="rt-budget-help"><small id="rt-budget-help">3–1000 轮 · 1M token 预算保护</small></label><button id="rt-start" class="button primary" disabled>开始圆桌 ↗</button></div><p id="rt-form-error" class="form-error" role="alert" hidden></p>
+            </form>
+            <section id="rt-output" class="panel rt-output" hidden><div class="panel-title"><h2 id="rt-title">讨论现场</h2><span id="rt-status" class="pill" aria-live="polite"></span></div><p id="rt-progress" class="muted" aria-live="polite"></p><div class="job-actions"><button id="rt-cancel" class="button danger small" type="button">停止会议</button><a id="rt-export" class="button secondary small" download>下载会议记录</a><button id="rt-develop" class="button primary small" type="button" hidden>进入代码开发 ↗</button></div><p id="rt-error" class="form-error" hidden></p><div id="rt-turns" class="rt-turns"></div><details class="advanced"><summary>当前方案与分歧</summary><pre id="rt-proposal"></pre><div id="rt-issues"></div></details></section>
+          </div><aside><section class="context-card"><span class="section-number">SOUND DESIGN / NEW MEMBER</span><h2 class="rt-audio-title">调音虾尾 <span>♫</span></h2><p>让模组的每次相遇，都有自己的声音。</p><ul class="capability-list"><li><span>NPC 对话</span><small>音色 · 情绪 · 台词表达</small></li><li><span>物品与交互</span><small>触发条件 · 声音层次 · 播放规则</small></li></ul><p class="field-help">已参与圆桌文本评审。StepAudio 音频生成尚未接通。</p></section><section class="context-card rt-history"><details id="rt-history-fold" open><summary>会议记录 <small>点击收起 / 展开</small></summary><div class="panel-title"><button id="rt-trash" class="text-button" type="button">回收站</button><button id="rt-refresh" class="text-button" type="button">刷新</button></div><div id="rt-history"></div></details></section></aside></div>
+        </section>
+        <section id="knowledge-view" aria-labelledby="knowledge-title" hidden>
+          <div class="section-intro"><div><div class="eyebrow"><span></span> YOUR CODE, SHARED CONTEXT</div><h1 id="knowledge-title">把经验，<em>留给下一次。</em></h1><p>选择游戏，查看基础知识与自己的代码资料。</p></div></div>
+          <div id="knowledge-choices" class="knowledge-choices" role="group" aria-label="选择游戏">
+            <button id="knowledge-minecraft" class="game-choice" type="button"><span class="game-choice-icon" aria-hidden="true">▧</span><strong>我的世界</strong><span>Minecraft 中国版 · 官方知识与代码库</span><small>进入知识空间 ↗</small></button>
+            <button id="knowledge-other" class="game-choice" type="button"><span class="game-choice-icon" aria-hidden="true">◇</span><strong>其他游戏</strong><span>未来更新</span><small>查看进展 ↗</small></button>
+          </div>
+          <div id="knowledge-game-content" hidden>
+            <button id="knowledge-back" class="text-button knowledge-back" type="button">← 返回游戏选择</button>
+            <section id="knowledge-other-content" class="panel future-games" aria-labelledby="future-games-title" hidden><h2 id="future-games-title">其他游戏</h2><p>未来更新</p></section>
+            <div id="knowledge-minecraft-content" hidden>
+              <section class="official-knowledge" aria-labelledby="official-knowledge-title">
+                <div class="panel-title"><div><span class="section-number">MINECRAFT / BASIC KNOWLEDGE</span><h2 id="official-knowledge-title">我的世界 · 官方基础知识</h2></div><button id="official-knowledge-sync" class="button secondary small" type="button">更新官方正文索引</button></div>
+                <p class="muted">两个官方入口已内置。正文索引状态见下方；已索引资料会默认用于开发参考，无需选择本地代码库。索引不代表完整站点。</p>
+                <div id="official-knowledge-cards" class="official-knowledge-cards">
+                  <article class="panel official-card" data-source-url="https://mc.163.com/dev/apidocs.html"><span class="pill">官方入口已内置</span><h3>ModSDK 接口文档</h3><p>查阅接口、事件与组件的官方说明。</p><p class="official-index-status" role="status">正在读取正文索引状态…</p><a href="https://mc.163.com/dev/apidocs.html" target="_blank" rel="noopener noreferrer">打开官方接口文档 ↗</a></article>
+                  <article class="panel official-card" data-source-url="https://mc.163.com/dev/guide.html"><span class="pill">官方入口已内置</span><h3>开发指南</h3><p>查阅我的世界中国版开发指南与实践说明。</p><p class="official-index-status" role="status">正在读取正文索引状态…</p><a href="https://mc.163.com/dev/guide.html" target="_blank" rel="noopener noreferrer">打开官方开发指南 ↗</a></article>
+                </div>
+                <p id="official-knowledge-message" class="field-help" role="status" aria-live="polite"></p>
+              </section>
+          <div class="knowledge-banner"><span aria-hidden="true">✳</span><p>持续学习通过本地代码索引与版本化经验实现。被采纳的经验会参与后续检索；不会训练或修改模型权重。</p></div>
+          <div class="knowledge-grid"><div>
+            <section class="panel import-panel"><div class="panel-title"><div><span class="section-number">01 / IMPORT</span><h2>导入参考代码库</h2></div></div><div class="import-tabs" role="group" aria-label="导入方式"><button id="import-path-tab" class="active" type="button" aria-pressed="true">本机目录</button><button id="import-zip-tab" type="button" aria-pressed="false">上传 ZIP</button></div><form id="import-form"><label for="repository-name">代码库名称 <span class="optional">选填</span><input id="repository-name" maxlength="120" placeholder="例如：我的世界 · 实体交互模组"></label><div id="path-input-group"><label for="repository-path">服务器上的本地目录<input id="repository-path" placeholder="/home/your-name/projects/my-addon" autocomplete="off" required></label><p class="field-help">目录需位于运行 SparkCraft 的这台设备上。</p></div><div id="zip-input-group" hidden><label class="file-drop" for="repository-zip"><span aria-hidden="true">↑</span><strong id="zip-label">选择本地代码库 ZIP</strong><small>最大 20 MiB · 保留目录结构</small><input id="repository-zip" type="file" accept=".zip,application/zip" disabled></label></div><div class="import-footer"><p>上传我的世界模组源码，或导入本机工程目录。跳过常见敏感文件与构建目录。</p><button id="import-submit" class="button primary" type="submit">导入并索引 <span aria-hidden="true">↗</span></button></div><p id="import-error" class="form-error" role="alert" hidden></p></form></section>
+            <section class="panel repositories-panel"><div class="panel-title"><div><span class="section-number">02 / LIBRARY</span><h2>本地代码库</h2></div><button id="refresh-repositories" class="text-button" type="button">刷新</button></div><div id="repository-list"><p class="empty-small">还没有代码库，导入工程后即可开始检索。</p></div></section>
+          </div><div>
+            <section id="repository-detail" class="panel repository-detail"><div class="panel-title"><div><span class="section-number">03 / CONTEXT</span><h2 id="repository-title">代码库上下文</h2></div><button id="reindex" type="button" class="text-button" hidden>重新索引</button></div><p id="repository-description" class="muted">选择代码库，查看可检索的源码和已沉淀的开发经验。</p><div id="repository-metrics" class="repository-metrics"></div><form id="search-form" class="search-form"><label class="sr-only" for="search-query">检索代码和经验</label><input id="search-query" placeholder="检索接口、功能或开发经验…" maxlength="500" required disabled><button id="search-submit" class="button secondary" type="submit" disabled>搜索</button></form><div id="search-results" aria-live="polite"></div></section>
+            <section class="panel feedback-panel"><div class="panel-title"><div><span class="section-number">04 / LEARN</span><h2>沉淀可复用经验</h2></div><span id="feedback-count" class="count">0</span></div><p class="muted">记录实际修正和验证结果。只有人工采纳的条目，才会参与后续开发检索。</p><div id="learning-candidate" class="candidate" hidden></div><form id="feedback-form"><label for="feedback-title">经验标题<input id="feedback-title" maxlength="200" placeholder="例如：自定义事件名称需保持两端一致" required disabled></label><label for="feedback-content">经验内容<textarea id="feedback-content" rows="3" maxlength="12000" placeholder="说明问题、解决方式及适用条件。" required disabled></textarea></label><label for="feedback-evidence">验证依据<textarea id="feedback-evidence" rows="2" maxlength="4000" placeholder="填写文件路径、任务 ID、实际检查或运行结果。" required disabled></textarea></label><label class="checkbox-label" for="feedback-accepted"><input id="feedback-accepted" type="checkbox" disabled><span>我已验证并采纳这条经验，允许用于后续检索</span></label><button id="feedback-submit" class="button secondary full" type="submit" disabled>保存开发经验</button><p id="feedback-error" class="form-error" role="alert" hidden></p></form><div id="feedback-list" class="feedback-list"></div></section>
+          </div></div>
+              <div id="minecraft-document-import"></div>
+            </div>
+          </div>
+        </section>
+        <footer class="page-footer"><span><i class="status-dot"></i> NVIDIA DGX spark黑客松---NVIDIA Developer社区说的都队</span><button id="opening-replay" class="text-button" type="button">重播开幕动画 ↗</button></footer>
+      </main>
+    </div>
+  </div>
+  <div class="sr-only" id="live-status" role="status" aria-live="polite"></div>
+</body>
+</html>

@@ -10,6 +10,7 @@
     planner: ["策", "#253c36", "#3c564b", "#a7d9c8"],
     balance: ["数", "#3c3423", "#625035", "#e1c794"],
     engineer: ["程", "#283b49", "#40566b", "#a9cce8"],
+    audio: ["音", "#403125", "#73523a", "#f1c38c"],
     reviewer: ["审", "#3a3046", "#5b456c", "#d0b8e9"],
   };
   const state = {meta: null, selected: null, meeting: null, history: [], selection: 0, selectionLoading: false, creating: false, historySignature: "", turnIds: new Set(), timelineRound: -1, detailBusy: false};
@@ -352,7 +353,7 @@
       catch (error) { if (version === dialogVersion) result.textContent = error.message; }
       finally { check.disabled = false; check.textContent = "检查连接"; }
     });
-    $("dialog-content").append(check, result, element("p", "config-hint", "Spark 可访问后，在服务端 .env 配置 Gateway 地址、认证和五个角色 ID，再重启 Python 服务。认证信息不会在网页中显示。连接检查只验证网关，真实角色能力还需单独验收。"));
+    $("dialog-content").append(check, result, element("p", "config-hint", "Spark 可访问后，在服务端 .env 配置 Gateway 地址、认证和六个角色 ID，再重启 Python 服务。认证信息不会在网页中显示。连接检查只验证网关，真实角色能力还需单独验收。"));
   }
 
   async function bootstrap() {

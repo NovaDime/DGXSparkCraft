@@ -1,0 +1,4 @@
+interface:
+  display_name: "ModSDK 编码与修复"
+  short_description: "为中国版模组编写代码、核对 API 依据并完成有界静态审查修复"
+  default_prompt: "使用 $modsdk-coding 将当前开发需求实现为有来源依据、可在 VS Code 审阅的代码。"

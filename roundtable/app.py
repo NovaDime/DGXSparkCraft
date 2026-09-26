@@ -18,6 +18,11 @@ from .providers import create_provider
 from .reporting import render_report
 from .skills import ROLE_SPECS, SkillCatalog
 from .storage import MeetingStore
+from .knowledge import KnowledgeStore
+from .knowledge_api import create_knowledge_router
+from .development import DevelopmentEngine, create_development_router
+from .agent_models import ModelRoutes, create_agent_router
+from .delivery import DeliveryEngine, create_delivery_router
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -55,24 +60,57 @@ def create_app(settings: Settings | None = None, provider=None) -> FastAPI:
         instance_lock = DataDirectoryLock(config.data_dir)
         store = None
         engine = None
+        knowledge = None
+        development = None
+        delivery = None
+        official = None
+        official_sync = None
         try:
             catalog = SkillCatalog(config.skills_dir)
             catalog.all()  # Fail startup early if the project's professional skills are missing.
             model_provider = provider or create_provider(config)
             store = MeetingStore(config.data_dir / "meetings.sqlite3")
             engine = RoundtableEngine(config, store, model_provider, catalog)
+            app.state.model_routes = ModelRoutes(config)
+            engine.model_routes = app.state.model_routes
             engine.recover()
+            from .official_knowledge import OfficialKnowledge
+            official = OfficialKnowledge(config.data_dir)
+            app.state.official_knowledge = official
+            engine.official_knowledge = official
+            knowledge = KnowledgeStore(config.data_dir / "knowledge")
+            development = DevelopmentEngine(config, model_provider, knowledge, store, catalog, engine._lane)
+            development.official_knowledge = official
             app.state.settings = config
             app.state.store = store
             app.state.engine = engine
             app.state.provider = model_provider
             app.state.catalog = catalog
+            app.state.knowledge = knowledge
+            app.state.development = development
+            delivery = DeliveryEngine(config, development, store, model_provider, app.state.model_routes)
+            app.state.delivery = delivery
+            if provider is None and config.provider_mode != "simulation" and not official.meta_path.exists():
+                import asyncio
+                official_sync = asyncio.create_task(official.sync())
             yield
         finally:
+            if official_sync:
+                official_sync.cancel()
+                import asyncio
+                await asyncio.gather(official_sync, return_exceptions=True)
+            if delivery:
+                await delivery.close()
+            if development:
+                await development.close()
             if engine:
                 await engine.close()
             if store:
                 store.close()
+            if knowledge:
+                knowledge.close()
+            if official:
+                official.close()
             instance_lock.close()
 
     app = FastAPI(title="UGC AI 圆桌", version=__version__, lifespan=lifespan,
@@ -94,8 +132,19 @@ def create_app(settings: Settings | None = None, provider=None) -> FastAPI:
                 length = int(request.headers.get("content-length", "0"))
             except ValueError:
                 return JSONResponse({"detail": "无效的请求长度。"}, status_code=400)
-            if length > 65536:
+            maximum = 20 * 1024 * 1024 if request.url.path == "/api/repositories/upload" else 65536
+            if length > maximum:
                 return JSONResponse({"detail": "请求过大，请缩短议题和约束。"}, status_code=413)
+            if request.url.path != "/api/repositories/upload":
+                # Enforce limits for chunked requests too, before JSON parsing.
+                size = 0
+                chunks = []
+                async for chunk in request.stream():
+                    size += len(chunk)
+                    if size > maximum:
+                        return JSONResponse({"detail": "请求过大。"}, status_code=413)
+                    chunks.append(chunk)
+                request._body = b"".join(chunks)
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -133,8 +182,18 @@ def create_app(settings: Settings | None = None, provider=None) -> FastAPI:
         return await request.app.state.provider.check()
 
     @app.get("/api/meetings")
-    async def meetings(request: Request):
-        return request.app.state.store.summaries()
+    async def meetings(request: Request, deleted: bool = False):
+        return request.app.state.store.summaries(deleted)
+
+    @app.post("/api/meetings/{meeting_id}/visibility")
+    async def meeting_visibility(meeting_id: str, request: Request, deleted: bool = True):
+        store = request.app.state.store
+        item = store.get(meeting_id)
+        if not item: raise HTTPException(404, "会议不存在")
+        if item["status"] in {"queued", "running"}: raise HTTPException(409, "请先停止会议再删除")
+        item["deleted"] = deleted
+        store.save(item)
+        return {"ok": True}
 
     @app.post("/api/meetings", status_code=201)
     async def create_meeting(body: MeetingRequest, request: Request):
@@ -171,6 +230,19 @@ def create_app(settings: Settings | None = None, provider=None) -> FastAPI:
     @app.get("/")
     async def index():
         return FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+
+    @app.get("/studio")
+    async def studio():
+        return FileResponse(STATIC_DIR / "studio.html")
+
+    from .official_knowledge import create_official_router
+    app.include_router(create_official_router())
+    from .documents import create_document_router
+    app.include_router(create_document_router())
+    app.include_router(create_knowledge_router())
+    app.include_router(create_agent_router())
+    app.include_router(create_development_router())
+    app.include_router(create_delivery_router())
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR, check_dir=False), name="static")
     return app

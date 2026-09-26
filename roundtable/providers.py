@@ -131,6 +131,13 @@ opening：主持人提出首稿。review：专家审阅 context.proposal 的同�
 有待解决问题就 revise，approve 时 concerns 必须为空。只允许关闭自己提出且仍 open
 的问题，resolved_issue_ids 必须来自 context.issues，解释解决依据。
 synthesis：主持人整合本轮所有意见并提出修订；不能替专家关闭问题。
+专家必须独立审阅，不复述别人的职责和问题。对已登记的同类问题引用原 ID，不重复提出。
+每轮先核对 own_open_issues，当前方案已覆盖的在 resolved_issue_ids 中关闭并在 summary 说明依据。
+没有本专业问题就 approve。缺少游戏实测、版本待核验或建议优化本身不是设计阻塞，放入 recommendations；
+仅当未知信息使具体设计无法成立或有明确缺陷时提出 concern，并给出最小可执行修订。
+opening 必须给出可评审的具体规则、必要假设和验收步骤，不能只列待讨论清单。
+synthesis 必须把合理建议写进完整 proposal，包括参数、边界和验收步骤，不能只总结缺什么。
+对未知版本使用明确的待验证能力边界，不编造 API；在用户范围内给出保守默认假设供下轮评审。
 若 all_approve=true 且主持人也 approve，proposal 必须原样返回 context.proposal
 或返回空字符串表示沿用，不能在通过时偷偷改稿。最终一致性由外部引擎判定。
 本项目控制服务用 Python 3，生成的模组脚本须遵守目标 ModSDK 的实际运行时；
@@ -163,7 +170,9 @@ class OpenClawProvider:
         self._client = client if client is not None else httpx.AsyncClient(follow_redirects=False, trust_env=False)
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
-        headers = {"Authorization": f"Bearer {self._token}"} if self._token else {}
+        headers = dict(kwargs.pop("headers", {}))
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
         try:
             response = await self._client.request(
                 method, self._base_url + path, headers=headers,
@@ -186,6 +195,17 @@ class OpenClawProvider:
             raise ProviderError("OpenClaw 请求未被接受，请检查网关地址及 Responses API 配置。", code="http_error")
         return response
 
+    async def _role_request(self, role, payload):
+        ref = role.get("model_ref") or ""
+        if ref.startswith("cloud/"):
+            from .cloud_models import CloudModels, CloudError
+            try:
+                text, usage = await CloudModels(self.settings.data_dir).generate(ref, instructions=payload["instructions"], prompt=payload["input"], max_tokens=payload["max_output_tokens"], timeout=self.settings.request_timeout_seconds)
+            except CloudError as exc:
+                raise ProviderError(str(exc), code="cloud_error") from None
+            return httpx.Response(200, json={"status":"completed", "output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":text}]}], "usage":usage})
+        return await self._request("POST", "/v1/responses", json=payload, headers={"x-openclaw-model":ref} if ref else {})
+
     async def generate(self, *, role: dict, context: dict) -> dict:
         agent_id = role.get("agent_id")
         if not isinstance(agent_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", agent_id):
@@ -196,51 +216,85 @@ class OpenClawProvider:
             raise ProviderError("本次上下文超过配置上限；请缩短议题或约束，或调整上下文预算。", code="context_limit")
         # A request cannot silently join another round or another role's history.
         scope = json.dumps([context["meeting_id"], role["id"], context["round"], context["phase"]], ensure_ascii=False)
-        user = "roundtable-" + hashlib.sha256(scope.encode("utf-8")).hexdigest()
-        response = await self._request("POST", "/v1/responses", json={
-            "model": f"openclaw/{agent_id}", "input": prompt, "stream": False, "user": user,
-            "max_output_tokens": getattr(self.settings, "max_output_tokens", 4096),
-        })
-        try:
-            envelope = response.json()
-        except (ValueError, RecursionError):
-            raise ProviderError("OpenClaw 返回了无效的 API 响应。", code="invalid_response") from None
-        if not isinstance(envelope, dict) or envelope.get("status") != "completed" or envelope.get("error"):
-            raise ProviderError("OpenClaw 未完整完成本次回复；未采用部分输出。", code="incomplete_response")
-        output = envelope.get("output")
-        if not isinstance(output, list):
-            raise ProviderError("OpenClaw 响应缺少 assistant 输出。", code="invalid_response")
-        final_message = None
-        for item in output:
-            if not isinstance(item, dict):
-                raise _invalid()
-            if item.get("type") == "function_call":
-                raise ProviderError("OpenClaw 返回了待执行工具调用，尚未形成完整圆桌意见。", code="tool_pending")
-            if item.get("type") != "message" or item.get("role") != "assistant":
-                continue
-            final_message = item
-        # Gateway agents can emit progress messages before their final opinion.
-        # Never fall back to an earlier JSON if the final message is malformed.
-        if final_message is None:
-            raise ProviderError("OpenClaw 响应缺少 assistant 输出。", code="invalid_response")
-        if final_message.get("status", "completed") != "completed" or not isinstance(final_message.get("content"), list):
-            raise ProviderError("OpenClaw assistant 输出不完整。", code="incomplete_response")
-        texts: list[str] = []
-        for part in final_message["content"]:
-            if not isinstance(part, dict) or part.get("type") != "output_text" or not isinstance(part.get("text"), str):
-                raise ProviderError("OpenClaw 未返回可解析的文本意见。", code="invalid_response")
-            texts.append(part["text"])
-        if not texts:
-            raise ProviderError("OpenClaw 响应缺少 assistant 输出。", code="invalid_response")
-        result = parse_generation("".join(texts))
-        _validate_references(result, role, context)
-        usage = envelope.get("usage")
-        if isinstance(usage, dict):
-            for key in ("input_tokens", "output_tokens"):
-                count = usage.get(key)
+        instructions = _INSTRUCTIONS + '\n必须遵守以下类型示例（内容自行填写）：{"summary":"摘要","stance":"revise","proposal":"方案正文","concerns":[],"recommendations":[],"resolved_issue_ids":[],"skill_ids":[]}。recommendations 必须是数组，不能是字符串。approve 时 concerns 必须是空数组；有任何 concerns 就必须 revise。' + (
+            "\n本次是 opening 阶段：你是主持者，应根据需求创建完整初始方案，proposal 必须为非空字符串。不要把需求当作已经提交的代码来审查。"
+            if context["phase"] == "opening" else "")
+        owned_issue_ids = sorted(
+            issue["id"] for issue in context.get("issues", [])
+            if issue.get("owner_role_id") == role["id"] and issue.get("status") == "open"
+        )
+        total_usage = {"input_tokens": 0, "output_tokens": 0}
+        usage_known = {"input_tokens": True, "output_tokens": True}
+        spent = 0
+        # UTF-8 bytes are a conservative proxy, not a tokenizer count. Reserve
+        # additional space for Gateway's hidden wrapper, plus maximum output.
+        reservation = len(prompt.encode("utf-8")) + len(instructions.encode("utf-8")) + 8192 + getattr(self.settings, "max_output_tokens", 4096) + 4096
+        remaining = context.get("remaining_token_budget", 1_000_000)
+        for attempt in range(3):
+            if spent + reservation > remaining:
+                error = ProviderError("已达到 1M token 预算保护线，剩余预算不足以安全发起下一次调用。已保留方案与分歧。", code="token_budget")
+                error.budget_tokens = spent
+                raise error
+            user_scope = scope + (f":protocol-repair:{attempt}" if attempt else "")
+            response = await self._role_request(role, {
+                "model": f"openclaw/{agent_id}", "input": prompt, "stream": False,
+                "user": "roundtable-" + hashlib.sha256(user_scope.encode("utf-8")).hexdigest(),
+                "instructions": instructions + (
+                    "\n上一响应未通过严格协议校验。请重新生成；skill_ids 只能是空数组或 [\"" + role["skill_id"] +
+                    "\"]，不得引用其他角色。resolved_issue_ids 只能是 [] 或 " +
+                    json.dumps(owned_issue_ids, ensure_ascii=False) + " 的子集。"
+                    if attempt else ""),
+                "temperature": 0.2,
+                "max_output_tokens": getattr(self.settings, "max_output_tokens", 4096),
+            })
+            try:
+                envelope = response.json()
+            except (ValueError, RecursionError):
+                raise ProviderError("OpenClaw 返回了无效的 API 响应。", code="invalid_response") from None
+            if not isinstance(envelope, dict) or envelope.get("status") != "completed" or envelope.get("error"):
+                raise ProviderError("OpenClaw 未完整完成本次回复；未采用部分输出。", code="incomplete_response")
+            usage = envelope.get("usage")
+            actual = sum(v for v in (usage or {}).values() if type(v) is int and v >= 0) if isinstance(usage, dict) else 0
+            spent += max(reservation, actual)
+            for key in total_usage:
+                count = usage.get(key) if isinstance(usage, dict) else None
                 if type(count) is int and count >= 0:
-                    result["usage"][key] = count
-        return result
+                    total_usage[key] += count
+                else:
+                    usage_known[key] = False
+            output = envelope.get("output")
+            if not isinstance(output, list):
+                raise ProviderError("OpenClaw 响应缺少 assistant 输出。", code="invalid_response")
+            final_message = None
+            for item in output:
+                if not isinstance(item, dict):
+                    raise _invalid()
+                if item.get("type") == "function_call":
+                    raise ProviderError("OpenClaw 返回了待执行工具调用，尚未形成完整圆桌意见。", code="tool_pending")
+                if item.get("type") == "message" and item.get("role") == "assistant":
+                    final_message = item
+            if final_message is None:
+                raise ProviderError("OpenClaw 响应缺少 assistant 输出。", code="invalid_response")
+            if final_message.get("status", "completed") != "completed" or not isinstance(final_message.get("content"), list):
+                raise ProviderError("OpenClaw assistant 输出不完整。", code="incomplete_response")
+            texts: list[str] = []
+            for part in final_message["content"]:
+                if not isinstance(part, dict) or part.get("type") != "output_text" or not isinstance(part.get("text"), str):
+                    raise ProviderError("OpenClaw 未返回可解析的文本意见。", code="invalid_response")
+                texts.append(part["text"])
+            if not texts:
+                raise ProviderError("OpenClaw 响应缺少 assistant 输出。", code="invalid_response")
+            try:
+                result = parse_generation("".join(texts))
+                _validate_references(result, role, context)
+            except ProviderError as exc:
+                if attempt < 2 and exc.code == "invalid_output":
+                    continue
+                raise
+            result["usage"] = {key: total_usage[key] if usage_known[key] else None for key in total_usage}
+            result["budget_tokens"] = spent
+            return result
+        raise ProviderError("模型连续三次未满足圆桌输出协议。", code="invalid_output")
 
     async def check(self) -> dict:
         try:
@@ -253,6 +307,43 @@ class OpenClawProvider:
         except (ValueError, RecursionError):
             return {"ok": False, "mode": self.mode, "message": "OpenClaw 模型列表不是有效 JSON。", "code": "invalid_response"}
         return {"ok": True, "mode": self.mode, "message": "OpenClaw 网关连通；尚未验证角色推理或 Spark 性能。", "inference_verified": False}
+
+    async def complete_text(self, *, prompt: str, agent_id: str, scope: str, schema: str | None = None, model_ref: str | None = None) -> tuple[str, dict]:
+        """Bounded coding/review request with an isolated, phase-specific session."""
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", agent_id):
+            raise ProviderError("编码角色 ID 无效。", code="configuration")
+        if len(prompt) > self.settings.max_context_chars:
+            raise ProviderError("开发任务上下文超过预算，请缩小任务范围。", code="context_limit")
+        response = await self._role_request({"model_ref": model_ref}, {
+            "model": f"openclaw/{agent_id}", "input": prompt, "stream": False,
+            "instructions": ("Return one valid JSON object only. No planning, no tools, no workspace exploration. All context is already supplied. Escape newlines and quotes within JSON strings. Do not repeat paths. " +
+                             (schema or ("Exact schema: {\"approved\":boolean,\"summary\":string,\"issues\":[string]}." if "review" in scope else
+                              "Exact schema: {\"summary\":string,\"files\":[{\"path\":string,\"content\":string}],\"assumptions\":[string],\"api_evidence\":[string]}. Each path must occur once. Write concise implementation, avoid long comments."))),
+            "temperature": 0.2,
+            "user": "development-" + hashlib.sha256(scope.encode()).hexdigest(),
+            "max_output_tokens": self.settings.max_output_tokens,
+        })
+        try:
+            envelope = response.json()
+            if not isinstance(envelope, dict) or envelope.get("status") != "completed" or envelope.get("error"):
+                raise ValueError()
+            output = envelope["output"]
+            if not isinstance(output, list) or any(not isinstance(x, dict) or x.get("type") == "function_call" for x in output):
+                raise ValueError()
+            messages = [x for x in output if x.get("type") == "message" and x.get("role") == "assistant"]
+            message = messages[-1]
+            if message.get("status", "completed") != "completed":
+                raise ValueError()
+            parts = message["content"]
+            if not isinstance(parts, list) or not parts or any(x.get("type") != "output_text" or not isinstance(x.get("text"), str) for x in parts):
+                raise ValueError()
+            usage = envelope.get("usage") or {}
+            return "".join(x["text"] for x in parts), {
+                k: usage.get(k) if type(usage.get(k)) is int and usage[k] >= 0 else None
+                for k in ("input_tokens", "output_tokens")
+            }
+        except (ValueError, KeyError, IndexError, TypeError, AttributeError, RecursionError):
+            raise ProviderError("OpenClaw 未返回完整开发结果；未采用部分输出。", code="incomplete_response") from None
 
     async def aclose(self) -> None:
         if self._owns_client:

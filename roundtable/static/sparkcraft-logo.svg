@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none">
+  <title>SparkCraft — 像素计算方块与火花</title>
+  <path d="M10 41 47 22 84 41V72L47 92 10 72Z" fill="#142a25"/>
+  <path d="M14 42 47 25 80 42 47 60Z" fill="#62816b"/>
+  <path d="M14 42 47 60V87L14 69Z" fill="#27483b"/>
+  <path d="M47 60 80 42V69L47 87Z" fill="#b89a63"/>
+  <path d="M19 42 47 28 74 42 47 56Z" fill="#8ba887"/>
+  <path d="M29 42 47 33 64 42 47 51Z" fill="#1c382c"/>
+  <path d="M52 64 56 62V79L52 81ZM60 60 64 58V75L60 77ZM68 56 72 54V71L68 73ZM76 52 78 51V68L76 69Z" fill="#504b35"/>
+  <path d="M20 54 26 57V61L20 58ZM29 59 35 62V66L29 63Z" fill="#c4ef92"/>
+  <path d="M20 65 39 75V78L20 68Z" fill="#577961"/>
+  <path d="M44 5H54V15H64V25H54V35H44V25H34V15H44Z" fill="#c6f477"/>
+  <path d="M44 15H54V25H44Z" fill="#f4ffd8"/>
+  <path d="M68 6H74V12H68ZM23 22H29V28H23Z" fill="#d1b179"/>
+</svg>

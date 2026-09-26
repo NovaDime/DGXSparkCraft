@@ -28,9 +28,19 @@ class APITests(unittest.TestCase):
         response = self.client.get("/api/meta")
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("do-not-expose-token", response.text)
-        self.assertEqual(len(response.json()["roles"]), 5)
+        self.assertEqual(len(response.json()["roles"]), 6)
         self.assertEqual(response.json()["limits"],
-                         {"max_rounds_min": 3, "max_rounds_default": 3, "max_rounds_max": 4})
+                         {"max_rounds_min": 3, "max_rounds_default": 3, "max_rounds_max": 1000})
+
+    def test_agent_model_api_rejects_unknown_routes_and_hides_credentials(self):
+        response = self.client.get("/api/agents")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()["roles"]), 6)
+        self.assertNotIn("do-not-expose-token", response.text)
+        self.assertEqual(self.client.post("/api/agents/audio/model", json={"model":"evil/unknown"}).status_code, 422)
+        self.assertEqual(self.client.post("/api/agents/missing/model", json={"model":""}).status_code, 422)
+        self.assertEqual(self.client.post("/api/agents/audio/model", json={"model":""}, headers={"origin":"https://outside.example"}).status_code, 403)
+        self.assertEqual(self.client.post("/api/agents/audio/model", json={"model":""}).status_code, 200)
 
     def test_create_detail_and_export(self):
         response = self.client.post("/api/meetings", json={"topic": "日常委托玩法评审"})
@@ -44,7 +54,7 @@ class APITests(unittest.TestCase):
         self.assertEqual(item["status"], "completed")
         self.assertEqual(item["current_round"], 3)
         self.assertTrue(item["include_reviewer"])
-        self.assertEqual(len(item["turns"]), 16)
+        self.assertEqual(len(item["turns"]), 19)
         markdown = self.client.get(f"/api/meetings/{meeting_id}/export?format=markdown")
         self.assertEqual(markdown.status_code, 200)
         self.assertIn("规则模拟", markdown.text)
@@ -56,7 +66,7 @@ class APITests(unittest.TestCase):
 
     def test_validation(self):
         for invalid in ({"topic": "   "}, {"topic": "有效的测试议题", "max_rounds": 2},
-                        {"topic": "有效的测试议题", "max_rounds": 5},
+                        {"topic": "有效的测试议题", "max_rounds": 1001},
                         {"topic": "有效的测试议题", "include_reviewer": "false"},
                         {"topic": "有效的测试议题", "include_reviewer": False},
                         {"topic": "有效的测试议题", "include_reviewer": True},
@@ -67,6 +77,12 @@ class APITests(unittest.TestCase):
         response = self.client.post("/api/meetings", json={"topic": "四轮上限验证", "max_rounds": 4})
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["max_rounds"], 4)
+
+    def test_custom_rounds_are_accepted(self):
+        response=self.client.post("/api/meetings",json={"topic":"自定义讨论轮数", "max_rounds":20})
+        self.assertEqual(response.status_code,201)
+        self.assertEqual(response.json()["max_rounds"],20)
+        self.assertEqual(response.json()["token_budget"],1_000_000)
 
     def test_page_has_only_three_and_four_round_choices(self):
         response = self.client.get("/")

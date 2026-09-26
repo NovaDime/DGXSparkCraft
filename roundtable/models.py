@@ -4,8 +4,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 TERMINAL_STATUSES = {"completed", "needs_review", "cancelled", "failed", "interrupted"}
 MIN_ROUNDS = 3
-MAX_ROUNDS = 4
+MAX_ROUNDS = 1000
 DEFAULT_ROUNDS = 3
+MAX_MEETING_TOKENS = 1_000_000
 
 
 class MeetingRequest(BaseModel):
@@ -32,6 +33,7 @@ class AgentResult(BaseModel):
     resolved_issue_ids: list[str] = Field(default_factory=list, max_length=100)
     skill_ids: list[str] = Field(default_factory=list, max_length=10)
     usage: dict = Field(default_factory=dict)
+    budget_tokens: int = Field(default=0, ge=0)
 
     @field_validator("recommendations", "resolved_issue_ids", "skill_ids")
     @classmethod

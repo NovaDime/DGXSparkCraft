@@ -35,9 +35,9 @@ class MeetingStore:
             rows = self.connection.execute("SELECT payload FROM meetings ORDER BY created_at DESC").fetchall()
         return [json.loads(row[0]) for row in rows]
 
-    def summaries(self) -> list[dict]:
+    def summaries(self, deleted=False) -> list[dict]:
         fields = ("id", "topic", "status", "provider_mode", "created_at", "updated_at", "current_round", "max_rounds", "include_reviewer")
-        return [{key: item[key] for key in fields} for item in self.all()]
+        return [{key: item[key] for key in fields} for item in self.all() if bool(item.get("deleted")) == deleted]
 
     def close(self):
         with self._lock:

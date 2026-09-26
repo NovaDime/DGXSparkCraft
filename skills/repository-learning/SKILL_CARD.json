@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "skill_id": "repository-learning",
+  "version": "0.1.0",
+  "description": "Retrieve attributed local code and retain human-reviewed project experience without model-weight training.",
+  "owner": {
+    "project": "DGXSparkCraft",
+    "responsible_person": null,
+    "status": "pending"
+  },
+  "license": {
+    "status": "not_declared",
+    "spdx_id": null
+  },
+  "requirements": {
+    "role": "learning",
+    "meeting_participant": false,
+    "model_route": "configured_development_route",
+    "tool_permissions": "Host-controlled file writes and trusted static checks; no execution of project code."
+  },
+  "data_boundary": "Imported source and reviewed experience stay in local storage; model context is sent only to the configured inference route. Verify provider endpoints before importing confidential material.",
+  "references": [
+    "SKILL.md",
+    "references/learning-records.md",
+    "evals/evals.json"
+  ],
+  "trust": {
+    "evaluation": {
+      "status": "scenarios_defined_not_run",
+      "evidence": "evals/evals.json"
+    },
+    "signature": {
+      "status": "unsigned",
+      "evidence": null
+    },
+    "target_runtime": {
+      "status": "not_verified",
+      "evidence": null
+    }
+  }
+}

@@ -110,7 +110,7 @@ def export_bundle(output: Path, target_root: str, settings: Settings | None = No
         "本包不包含 API 密钥或模型权重，默认拒绝所有 Agent 工具；执行沙箱和网络策略仍须单独配置。"
         "需要放开数值计算脚本时必须先核对实际权限和隔离效果，不得仅凭 Skill 文本认定工具可用。"
         "Skills 可见性不是文件访问控制。数值工具只有在执行权限和 Python 运行时可用后才可使用。\n\n"
-        "在 Spark 上先确认五个 Agent 可分别调用，并在角色工作区验证 Skills 可见，"
+        "在 Spark 上先确认六个 Agent 可分别调用，并在角色工作区验证 Skills 可见，"
         "再将本项目 ROUNDTABLE_PROVIDER 切换为 openclaw。GET /v1/models 只检查连通；"
         "还需核对每个角色的真实模型路由和实际调用日志。\n\n"
         "deployment-plan.json 是本地配置预检结果，目标配置校验、真实调用与性能测试均未执行。"
