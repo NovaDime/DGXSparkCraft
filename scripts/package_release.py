@@ -31,7 +31,18 @@ def main():
     for path,rel,payload in members:
         target=output/rel;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,target)
         manifest[rel.as_posix()]=hashlib.sha256(payload).hexdigest()
-    (output/'RELEASE-MANIFEST.json').write_text(json.dumps({'version':'1.0.0','files':manifest,'excluded':['credentials','user data','git history','web archives','installed runtimes','model weights']},ensure_ascii=False,indent=2))
+    (output/'RELEASE-MANIFEST.json').write_text(
+        json.dumps(
+            {
+                'version':'1.1.0',
+                'files':manifest,
+                'excluded':['credentials','user data','git history','web archives','installed runtimes','model weights'],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding='utf-8',
+    )
     archive=Path(str(output)+'.zip')
     with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED) as z:
         for path in sorted(output.rglob('*')):

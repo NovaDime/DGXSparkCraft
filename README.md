@@ -1,4 +1,4 @@
-# SparkCraft 1.0 · 助力开发你想要的世界
+# SparkCraft 1.1.0 · 助力开发你想要的世界
 
 用 NVIDIA DGX Spark 打造游戏 UGC 多智能体“AI 圆桌”协作系统。
 
@@ -81,7 +81,7 @@ compat/windows/      历史 Windows 入口，仅兼容保留
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -q
-.venv/bin/python scripts/package_release.py --output ../V1.0便携版
+.venv/bin/python scripts/package_release.py --output ../SparkCraft-V1.1.0-GitHub
 ```
 
 便携版可移动源码，在目标机按上述步骤准备依赖；不携带作者的模型权重、凭证或用户数据。发布脚本拒绝覆盖已有目录。
