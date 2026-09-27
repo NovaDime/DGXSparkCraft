@@ -39,6 +39,8 @@ class ProductionProvider:
         scope = args['scope']
         if scope.endswith(':plan'):
             result = {**PLAN, "assets":[]}
+        elif scope.endswith(':art-plan'):
+            result = {'art_assets':[]}
         elif scope.endswith(':audio-plan'):
             result = {"assets":[ASSET]}
         elif 'review' in scope:
@@ -117,7 +119,7 @@ class DeliveryTests(unittest.TestCase):
             draft=client.post(f'/api/meetings/{meeting_id}/delivery').json()
             item=self.wait(client,draft['id'])
             self.assertEqual(item['status'],'awaiting_approval',item)
-            self.assertEqual(len(provider.calls),2)
+            self.assertEqual(len(provider.calls),3)
             self.assertFalse(item['code_job_id']); self.assertIsNone(item['approval'])
             self.assertEqual(client.post(f'/api/meetings/{meeting_id}/delivery').json()['id'],item['id'])
             self.assertEqual(client.post('/api/development/jobs',json={'task':'直接绕过审核执行','meeting_id':meeting_id}).status_code,409)
@@ -151,7 +153,7 @@ class DeliveryTests(unittest.TestCase):
             draft=client.post(f'/api/meetings/{mid}/delivery').json(); item=self.wait(client,draft['id'])
             response=client.post(f"/api/deliveries/{item['id']}/approve",json={'revision':1,'confirmed':True,'plan':PLAN})
             self.assertEqual(response.status_code,200)
-            blocked=self.wait(client,item['id']); self.assertEqual(blocked['status'],'blocked'); self.assertEqual(len(provider.calls),2)
+            blocked=self.wait(client,item['id']); self.assertEqual(blocked['status'],'blocked'); self.assertEqual(len(provider.calls),3)
             self.assertEqual(client.post(f"/api/deliveries/{item['id']}/retry",json={}).status_code,400)
             revised=client.post(f"/api/deliveries/{item['id']}/revise",json={'notes':'将欢迎语改为更简短的版本'}).json()
             self.assertIsNone(revised['plan'], '旧任务单不能冒充新修订稿进入审核表单')

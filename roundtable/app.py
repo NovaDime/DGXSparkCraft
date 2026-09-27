@@ -79,6 +79,7 @@ def create_app(settings: Settings | None = None, provider=None) -> FastAPI:
             app.state.official_knowledge = official
             engine.official_knowledge = official
             knowledge = KnowledgeStore(config.data_dir / "knowledge")
+            engine.knowledge = knowledge
             development = DevelopmentEngine(config, model_provider, knowledge, store, catalog, engine._lane)
             development.official_knowledge = official
             app.state.settings = config
@@ -201,6 +202,8 @@ def create_app(settings: Settings | None = None, provider=None) -> FastAPI:
             return request.app.state.engine.create(body)
         except QueueFullError as exc:
             raise HTTPException(429, str(exc)) from None
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from None
 
     @app.get("/api/meetings/{meeting_id}")
     async def meeting_detail(meeting_id: str, request: Request):

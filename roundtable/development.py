@@ -288,6 +288,8 @@ class DevelopmentEngine:
                     # Bound retrieved content independently of a large source file/chunk.
                     for hit in job["retrieval"]:
                         hit["content"] = hit["content"][:1600]
+                if not job["repository_id"]:
+                    job["retrieval"] = self.knowledge.search_all(job["task"], limit=6)
                 job["project_files"] = [p.relative_to(base).as_posix() for p in sorted(base.rglob("*")) if p.is_file()][:400]
                 job["source_files"] = []
                 remaining = 12000

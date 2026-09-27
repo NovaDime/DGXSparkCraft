@@ -96,10 +96,10 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(meeting["status"], "completed")
         self.assertEqual(meeting["current_round"], 3)
         self.assertEqual([role for role, context in provider.calls],
-                         ["host"] + ["planner", "balance", "engineer", "audio", "reviewer", "host"] * 3)
+                         ["host"] + ["planner", "balance", "engineer", "audio", "art", "reviewer", "host"] * 3)
         self.assertEqual({context["proposal"] for _, context in provider.calls if context["phase"] == "review"}, {"首版方案"})
         self.assertTrue(all(not context["round_reviews"] for _, context in provider.calls if context["phase"] == "review"))
-        self.assertTrue(all(len(context["round_reviews"]) == 5 for _, context in provider.calls if context["phase"] == "synthesis"))
+        self.assertTrue(all(len(context["round_reviews"]) == 6 for _, context in provider.calls if context["phase"] == "synthesis"))
         self.assertIsNone(meeting["metrics"]["input_tokens"])
         self.assertIn("规则模拟", meeting["final_report"])
         self.assertTrue(all(turn["skill_sha256"] for turn in meeting["turns"]))
@@ -122,7 +122,7 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         meeting = await self.run_meeting(provider, max_rounds=4)
         self.assertEqual(meeting["status"], "completed")
         self.assertEqual(meeting["current_round"], 4)
-        self.assertEqual(len(provider.calls), 25)
+        self.assertEqual(len(provider.calls), 29)
         self.assertEqual(meeting["issues"][0]["status"], "resolved")
 
     async def test_four_round_limit_keeps_unresolved_issue(self):
@@ -133,7 +133,7 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
         meeting = await self.run_meeting(provider, max_rounds=4)
         self.assertEqual(meeting["status"], "needs_review")
         self.assertEqual(meeting["current_round"], 4)
-        self.assertEqual(len(provider.calls), 25)
+        self.assertEqual(len(provider.calls), 29)
         self.assertEqual(meeting["issues"][0]["status"], "open")
 
     async def test_explicit_owner_resolution_and_second_round(self):

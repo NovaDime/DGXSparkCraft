@@ -11,8 +11,10 @@ MAX_MEETING_TOKENS = 1_000_000
 
 class MeetingRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-    topic: str = Field(min_length=4, max_length=4000)
+    topic: str = Field(min_length=4, max_length=20000)
     constraints: str = Field(default="", max_length=4000)
+    parent_meeting_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$")
+    revision_notes: str = Field(default="", max_length=2000)
     max_rounds: int = Field(default=DEFAULT_ROUNDS, ge=MIN_ROUNDS, le=MAX_ROUNDS, strict=True)
 
 

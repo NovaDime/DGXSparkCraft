@@ -10,7 +10,7 @@
   $('minecraft-document-import').append(panel);
   const msg = text => {$('doc-message').textContent=text;};
   async function api(path, body, raw=false) {
-    const response=await fetch(path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':raw?'application/octet-stream':'application/json'},body:body===undefined?undefined:raw?body:JSON.stringify(body),signal:AbortSignal.timeout(240000)});
+    const response=await fetch(path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':raw?'application/octet-stream':'application/json'},body:body===undefined?undefined:raw?body:JSON.stringify(body),signal:AbortSignal.timeout(900000)});
     const data=await response.json();if(!response.ok)throw new Error(typeof data.detail==='string'?data.detail:'配置或资料格式无效');return data;
   }
   function chooseGame(game) {
@@ -30,7 +30,7 @@
       const count = Number(source?.document_count) || 0;
       const characters = Number(source?.character_count) || 0;
       const indexed = count > 0 && characters > 0;
-      const labels = {partial: '已索引部分官方正文', reference_snapshot: '已索引固定版本参考片段（非主站正文）'};
+      const labels = {guide_snapshot: '开发指南全文快照（固定仓库版本）', guide_snapshot_partial: '开发指南快照（存在未下载文章）', partial: '已索引部分官方正文', reference_snapshot: '已索引固定版本参考片段（非主站正文）'};
       card.querySelector('.official-index-status').textContent = indexed
         ? `${labels[source.status] || '已缓存部分资料'} · ${count} 篇 · ${characters.toLocaleString()} 字符`
         : source?.status === 'baseline_only' ? '基础规则已预置 · 官方正文尚未索引' : '正文索引尚未就绪 · 可尝试更新索引';
@@ -49,7 +49,7 @@
     button.textContent = '正在更新…';
     $('official-knowledge-message').textContent = '正在获取官方正文并更新索引，请稍候…';
     try {
-      const response = await fetch('/api/official-knowledge/sync', {method: 'POST', signal: AbortSignal.timeout(240000)});
+      const response = await fetch('/api/official-knowledge/sync', {method: 'POST', signal: AbortSignal.timeout(900000)});
       const data = await response.json();
       if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : '官方资料更新失败');
       renderOfficial(data);

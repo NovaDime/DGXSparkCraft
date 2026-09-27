@@ -27,7 +27,7 @@ def run(command, **kwargs):
     return subprocess.run(list(map(str, command)), check=True, cwd=ROOT, **kwargs)
 
 def model_command():
-    return ['docker', 'run', '-d', '--name', 'sparkcraft-nemotron-3-5', '--gpus', 'all', '--ipc=host',
+    return ['docker', 'run', '-d', '--name', 'sparkcraft-nemotron-3-5', '--label', 'ai.sparkcraft.managed=nemotron', '--gpus', 'all', '--ipc=host',
             '-p', '127.0.0.1:8000:8000', '-v', str(Path.home()/'.cache/huggingface')+':/root/.cache/huggingface',
             IMAGE, '--model', MODEL, '--served-model-name', ALIAS, '--moe-backend', 'marlin',
             '--kv-cache-dtype', 'fp8', '--enable-prefix-caching', '--gpu-memory-utilization', '0.85',
@@ -49,19 +49,54 @@ def provision_model(timeout):
     if model:
         print('复用本机 Nemotron：' + model)
         return model
-    with socket.socket() as probe:
-        if probe.connect_ex(('127.0.0.1', 8000)) == 0:
-            raise RuntimeError('8000 已被占用但模型 API 不可用；未启动新模型。')
-    result = run(['nvidia-smi', '--query-compute-apps=pid', '--format=csv,noheader'], capture_output=True, text=True)
-    if result.stdout.strip():
-        raise RuntimeError('GPU 已有计算进程；为避免影响现有任务，请先准备可复用的模型服务。')
-    run(['docker', 'info'], stdout=subprocess.DEVNULL)
-    # No stop/remove/restart operation: a same-name container fails safely for inspection.
-    run(model_command())
+    # Reuse the known local installation only after checking model, image and binding.
+    legacy = subprocess.run(['docker', 'inspect', 'nemotron-3.5-lightning'], capture_output=True, text=True)
+    if legacy.returncode == 0:
+        item = json.loads(legacy.stdout)[0]
+        config = item.get('Config', {})
+        bindings = item.get('HostConfig', {}).get('PortBindings', {}).get('8000/tcp', [])
+        if config.get('Image') == IMAGE and MODEL in config.get('Cmd', []) and any(b.get('HostIp') == '127.0.0.1' and b.get('HostPort') == '8000' for b in bindings):
+            if not item['State']['Running']:
+                with socket.socket() as probe:
+                    if probe.connect_ex(('127.0.0.1',8000)) == 0: raise RuntimeError('模型端口被占用，未启动原容器')
+                busy = run(['nvidia-smi','--query-compute-apps=pid','--format=csv,noheader'],capture_output=True,text=True)
+                if busy.stdout.strip(): raise RuntimeError('GPU 已被其他计算任务使用，未启动原容器')
+                run(['docker','start','nemotron-3.5-lightning'])
+            print('等待已有 Nemotron 容器加载，复用原权重缓存。',flush=True)
+            deadline=time.monotonic()+timeout
+            while time.monotonic()<deadline:
+                model=available_model()
+                if model:return model
+                time.sleep(5)
+            raise RuntimeError('原模型容器尚未就绪，请检查 docker logs nemotron-3.5-lightning')
+    # Only resume a container whose explicit label and model match this installer.
+    inspection = subprocess.run(['docker', 'inspect', 'sparkcraft-nemotron-3-5'], capture_output=True, text=True)
+    managed = None
+    if inspection.returncode == 0:
+        managed = json.loads(inspection.stdout)[0]
+        config = managed.get('Config', {})
+        if config.get('Labels', {}).get('ai.sparkcraft.managed') != 'nemotron' or MODEL not in config.get('Cmd', []):
+            raise RuntimeError('同名模型容器不是本部署器管理的实例，未启动或覆盖。')
+    if not managed or not managed['State']['Running']:
+        with socket.socket() as probe:
+            if probe.connect_ex(('127.0.0.1', 8000)) == 0:
+                raise RuntimeError('8000 已被占用但模型 API 不可用；未启动新模型。')
+        result = run(['nvidia-smi', '--query-compute-apps=pid', '--format=csv,noheader'], capture_output=True, text=True)
+        if result.stdout.strip():
+            raise RuntimeError('GPU 已有计算进程；未启动额外模型以避免影响现有任务。')
+        run(['docker', 'info'], stdout=subprocess.DEVNULL)
+        if managed:
+            run(['docker', 'start', 'sparkcraft-nemotron-3-5'])
+        else:
+            run(model_command())
+    print('等待 Nemotron 模型接口就绪；首次下载或加载可能较久。', flush=True)
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         model = available_model()
         if model: return model
+        state = subprocess.run(['docker', 'inspect', '--format', '{{.State.Status}}', 'sparkcraft-nemotron-3-5'], capture_output=True, text=True)
+        if state.returncode == 0 and state.stdout.strip() in {'exited','dead'}:
+            raise RuntimeError('模型容器已停止，请检查 docker logs sparkcraft-nemotron-3-5；未无限等待。')
         time.sleep(5)
     raise RuntimeError('模型尚未就绪（首次下载较慢）。查看 docker logs sparkcraft-nemotron-3-5，等待后重新部署；未停止容器。')
 
@@ -88,6 +123,7 @@ def install_node():
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--no-browser', action='store_true')
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--model-timeout', type=int, default=3600)
     args = parser.parse_args(argv)
@@ -116,7 +152,7 @@ def main(argv=None):
     run([python, '-m', 'pip', 'install', '-r', ROOT/'requirements.txt'])
     run([python, ROOT/'scripts/setup_local_openclaw.py', '--model', model], env=env)
     run([sys.executable, ROOT/'scripts/install_desktop.py'])
-    run([sys.executable, ROOT/'scripts/linux_studio.py', 'start'], env=env)
+    run([sys.executable, ROOT/'scripts/linux_studio.py', 'start'] + (['--no-browser'] if args.no_browser else []), env=env)
 
 if __name__ == '__main__':
     try: main()

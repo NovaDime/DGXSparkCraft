@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "skill_id": "minecraft-art",
+  "version": "1.0.0",
+  "description": "Multimodal art planning, nine-slice and sequence-frame contracts.",
+  "requirements": {
+    "role": "art",
+    "meeting_participant": true,
+    "model_route": "spark_local_discussion_multimodal_generation_pending",
+    "tool_permissions": "deny_all_by_default",
+    "credential_values_in_card": false
+  },
+  "references": [
+    "SKILL.md",
+    "references/official-art-contract.md"
+  ],
+  "trust": {
+    "signature": {
+      "status": "unsigned"
+    }
+  }
+}

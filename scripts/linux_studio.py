@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import signal
 import subprocess
+import socket
 import sys
 import time
 from urllib.request import urlopen
@@ -44,6 +45,42 @@ def health():
             return bool(json.load(response).get('ok'))
     except Exception: return False
 
+def existing_studio_root():
+    """Identify the actual listener, not any similarly named process on this host."""
+    inodes = set()
+    for table in ('/proc/net/tcp', '/proc/net/tcp6'):
+        try:
+            for line in Path(table).read_text().splitlines()[1:]:
+                fields = line.split()
+                if fields[3] == '0A' and int(fields[1].split(':')[1], 16) == 8765:
+                    inodes.add(fields[9])
+        except OSError:
+            continue
+    if not inodes:
+        return None
+    for process in Path('/proc').iterdir():
+        if not process.name.isdigit():
+            continue
+        try:
+            if process.stat().st_uid != os.getuid():
+                continue
+            sockets = {os.readlink(fd) for fd in (process/'fd').iterdir()}
+            if not any('socket:[' + inode + ']' in sockets for inode in inodes):
+                continue
+            folder = (process/'cwd').resolve()
+            words = (process/'cmdline').read_bytes().decode().split('\0')
+            if not any(word in ('scripts/run_studio.py', str(folder/'scripts/run_studio.py')) for word in words):
+                continue
+            if not (folder/'roundtable/static/studio.html').is_file():
+                continue
+            with urlopen('http://127.0.0.1:8765/api/meta', timeout=3) as response:
+                meta = json.load(response)
+            if meta.get('app_name') == 'UGC AI 圆桌' and {'host','planner','balance','engineer','audio','reviewer'} <= {r['id'] for r in meta.get('roles', [])}:
+                return folder
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    return None
+
 def launch(args, name):
     RUN.mkdir(parents=True,exist_ok=True)
     with (RUN/(name+'.log')).open('ab') as output:
@@ -61,22 +98,59 @@ def open_studio():
     else:
         print('未找到 xdg-open，请手动打开：' + url)
 
+def ensure_dependencies():
+    """Bring up model and the project Gateway before declaring Studio ready."""
+    try:
+        from .deploy_spark import provision_model
+    except ImportError:
+        from deploy_spark import provision_model
+    print('检查本机 Nemotron 模型…', flush=True)
+    provision_model(3600)
+    current = processes()
+    if not current['gateway'] and not current['launcher']:
+        with socket.socket() as probe:
+            if probe.connect_ex(('127.0.0.1',19789)) == 0:
+                raise RuntimeError('19789 被其他 Gateway 占用，未接管；请使用原项目入口。')
+        launch([str(PYTHON),str(ROOT/'scripts/setup_local_openclaw.py'),'--start'],'gateway')
+    print('等待项目 OpenClaw Gateway 就绪…', flush=True)
+    for _ in range(120):
+        if processes()['gateway']:
+            with socket.socket() as probe:
+                if probe.connect_ex(('127.0.0.1',19789)) == 0:
+                    print('本地模型与 OpenClaw 已连接。', flush=True)
+                    return
+        time.sleep(.5)
+    raise RuntimeError('项目 Gateway 未就绪，请查看 data/runtime/gateway.log')
+
+
 def start(simulation=False, browser=True):
     current=processes()
     if current['studio']:
         if not health(): raise RuntimeError('项目进程存在但服务未就绪，请查看 data/runtime/studio.log')
+        if not simulation: ensure_dependencies()
         print('SparkCraft 已运行：http://127.0.0.1:8765/studio')
         if browser: open_studio()
         return
-    if health(): raise RuntimeError('8765 已有其他服务，未接管。请检查端口。')
-    if not PYTHON.exists(): raise RuntimeError('请先执行：python3 -m venv .venv，然后 .venv/bin/pip install -r requirements.txt')
-    if not simulation and not current['gateway']:
-        if current['launcher']: raise RuntimeError('项目 Gateway 正在启动，请稍后重试。')
-        launch([str(PYTHON),str(ROOT/'scripts/setup_local_openclaw.py'),'--start'],'gateway')
-        for _ in range(20):
-            if processes()['gateway']: break
-            time.sleep(.5)
-        else: raise RuntimeError('项目 Gateway 未启动，请查看 data/runtime/gateway.log')
+    if health():
+        existing = existing_studio_root()
+        if existing:
+            print('检测到另一目录的 SparkCraft 已运行，打开现有工作台：' + str(existing))
+            print('本次使用上述目录的数据；没有启动便携目录的新实例。')
+            print('如需独立运行当前目录，请先结束上述目录的服务，再在当前目录执行一键部署。')
+            command = [sys.executable, str(existing/'scripts/linux_studio.py'), 'start']
+            if not browser: command.append('--no-browser')
+            if simulation: command.append('--simulation')
+            subprocess.run(command, cwd=existing, check=True)
+            return
+        raise RuntimeError('8765 已被无法确认身份的服务占用，未接管。请检查端口。')
+    if not PYTHON.exists():
+        if simulation: raise RuntimeError("模拟模式请先创建 .venv 并安装 requirements.txt")
+        print('首次运行：准备本地依赖、OpenClaw 和 Nemotron。需要联网，模型下载可能较大。', flush=True)
+        command = [sys.executable, str(ROOT/'scripts/deploy_spark.py')]
+        if not browser: command.append('--no-browser')
+        # Release the launcher lock before installer launches this entry again.
+        os.execv(sys.executable, command)
+    if not simulation: ensure_dependencies()
     args=[str(PYTHON),str(ROOT/'scripts/run_studio.py')]
     if simulation: args.append('--simulation')
     pid=launch(args,'studio')
@@ -136,5 +210,5 @@ def main():
 
 if __name__=='__main__':
     try: main()
-    except (RuntimeError,OSError) as error:
+    except (RuntimeError,OSError,subprocess.CalledProcessError) as error:
         print(str(error),file=sys.stderr); sys.exit(1)

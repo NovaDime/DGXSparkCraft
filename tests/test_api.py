@@ -28,14 +28,14 @@ class APITests(unittest.TestCase):
         response = self.client.get("/api/meta")
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("do-not-expose-token", response.text)
-        self.assertEqual(len(response.json()["roles"]), 6)
+        self.assertEqual(len(response.json()["roles"]), 7)
         self.assertEqual(response.json()["limits"],
                          {"max_rounds_min": 3, "max_rounds_default": 3, "max_rounds_max": 1000})
 
     def test_agent_model_api_rejects_unknown_routes_and_hides_credentials(self):
         response = self.client.get("/api/agents")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()["roles"]), 6)
+        self.assertEqual(len(response.json()["roles"]), 7)
         self.assertNotIn("do-not-expose-token", response.text)
         self.assertEqual(self.client.post("/api/agents/audio/model", json={"model":"evil/unknown"}).status_code, 422)
         self.assertEqual(self.client.post("/api/agents/missing/model", json={"model":""}).status_code, 422)
@@ -54,7 +54,7 @@ class APITests(unittest.TestCase):
         self.assertEqual(item["status"], "completed")
         self.assertEqual(item["current_round"], 3)
         self.assertTrue(item["include_reviewer"])
-        self.assertEqual(len(item["turns"]), 19)
+        self.assertEqual(len(item["turns"]), 22)
         markdown = self.client.get(f"/api/meetings/{meeting_id}/export?format=markdown")
         self.assertEqual(markdown.status_code, 200)
         self.assertIn("规则模拟", markdown.text)

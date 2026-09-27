@@ -11,6 +11,7 @@ from fastapi import APIRouter, Request
 from starlette.concurrency import run_in_threadpool
 from .knowledge import KnowledgeStore
 from .documents import extract_document
+from .guide_snapshot import sync_guide
 
 BUNDLED = Path(__file__).resolve().parent.parent / 'knowledge' / 'minecraft'
 REVISION = '4a9b3f90ccb7ab0c631815d004f07a9e4f64c950'
@@ -41,7 +42,7 @@ class OfficialKnowledge:
     def public(self):
         return {'sources':[{**{k:v for k,v in s.items() if k!='baseline'},
                  **self.meta.get(s['id'], {'status':'baseline_only','document_count':0,'character_count':0,'updated_at':None})} for s in SOURCES],
-                'message':'两份官方文档是默认开发前置资料，自动进入圆桌、编码与评审上下文。基础规则不等于官网全文；正文与参考快照会分别标注来源。'}
+                'message':'官方 API 与开发指南默认供圆桌、编码、评审检索。开发指南按固定版本缓存全部可获取的 Markdown 正文，图片/视频保留链接；仓库快照不等于官网当前版本。'}
 
     def context(self, query):
         hits = []
@@ -92,6 +93,10 @@ class OfficialKnowledge:
                         except (httpx.HTTPError,ValueError,OSError): return 0
                     sizes=await asyncio.gather(*(reference(i,p) for i,p in enumerate(REFERENCE_PATHS)))
                     if any(sizes): self.meta['api'].update(status='reference_snapshot',document_count=sum(bool(x) for x in sizes),character_count=sum(sizes),updated_at=datetime.now(timezone.utc).isoformat(),reference_revision=REVISION,note='主站不可读，已缓存 MCNeteaseDevs 参考快照；不是官网完整镜像，需核对目标 SDK。')
+            try:
+                self.meta['guide'] = await sync_guide(self.source_root / 'guide')
+            except (httpx.HTTPError, ValueError, OSError):
+                self.meta.setdefault('guide', {}).update(note='开发指南同步失败，保留已有正文；可稍后重试。')
             await run_in_threadpool(self.refresh_index)
             temp=self.meta_path.with_suffix('.tmp');temp.write_text(json.dumps(self.meta,ensure_ascii=False,indent=2));temp.replace(self.meta_path)
             return self.public()

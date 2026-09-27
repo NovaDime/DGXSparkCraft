@@ -474,6 +474,16 @@ class KnowledgeStore:
                                         (json.dumps(item, ensure_ascii=False), repository_id, feedback_id))
             return item
 
+    def search_all(self, query: str, limit: int = 6) -> list[dict]:
+        """Read-only evidence across the library; never copy example projects into output."""
+        hits = []
+        for repo in self.list():
+            for hit in self.search(repo['id'], query[:4000], limit=limit):
+                hits.append({**hit, 'repository_id': repo['id'], 'repository_name': repo['name'],
+                             'repository_revision': repo['revision'], 'content': hit['content'][:1600]})
+        hits.sort(key=lambda hit: hit.get('score', 0), reverse=True)
+        return hits[:limit]
+
     def context(self, repository_id: str, query: str, limit: int = 6) -> dict:
         """Return one coherent revision; immutable roots remain valid after reindex."""
         with self._lock:

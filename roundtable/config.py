@@ -43,7 +43,7 @@ class Settings:
     skills_dir: Path = ROOT / "skills"
     examples_path: Path = ROOT / "examples" / "topics.json"
     agent_ids: dict[str, str] = field(default_factory=lambda: {
-        role: role for role in ("host", "planner", "balance", "engineer", "audio", "reviewer")
+        role: role for role in ("host", "planner", "balance", "engineer", "audio", "art", "reviewer")
     })
     max_queued_meetings: int = 10
     coding_agent_id: str = "coder"
@@ -64,10 +64,10 @@ class Settings:
             raise ValueError("上下文字符预算必须在 8000 至 128000 之间")
         if not 512 <= self.max_output_tokens <= 8192:
             raise ValueError("单次输出 token 预算必须在 512 至 8192 之间")
-        if set(self.agent_ids) != {"host", "planner", "balance", "engineer", "audio", "reviewer"}:
-            raise ValueError("必须为六个圆桌角色分别配置 Agent ID")
-        if len(set(self.agent_ids.values())) != 6:
-            raise ValueError("六个角色必须使用不同的 OpenClaw Agent ID，以保持专业会话独立")
+        if set(self.agent_ids) != {"host", "planner", "balance", "engineer", "audio", "art", "reviewer"}:
+            raise ValueError("必须为七个圆桌角色分别配置 Agent ID")
+        if len(set(self.agent_ids.values())) != 7:
+            raise ValueError("七个角色必须使用不同的 OpenClaw Agent ID，以保持专业会话独立")
         for value in self.agent_ids.values():
             if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", value):
                 raise ValueError("OpenClaw Agent ID 仅支持字母、数字、下划线和连字符")
@@ -92,7 +92,7 @@ class Settings:
             coding_agent_id=source.get("OPENCLAW_AGENT_CODER", "coder"),
             data_dir=data_dir.resolve(),
             agent_ids={role: source.get(f"OPENCLAW_AGENT_{role.upper()}", role)
-                       for role in ("host", "planner", "balance", "engineer", "audio", "reviewer")},
+                       for role in ("host", "planner", "balance", "engineer", "audio", "art", "reviewer")},
         )
 
     def provider_info(self) -> dict:

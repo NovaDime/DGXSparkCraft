@@ -10,6 +10,7 @@ ROLE_SPECS = [
     {"id": "balance", "name": "数值虾", "title": "数值评审", "description": "检查奖励、概率、成长与经济循环的合理性。", "skill_id": "minecraft-balance"},
     {"id": "engineer", "name": "程序虾皮", "title": "技术可行性", "description": "依据目标 ModSDK 评估实现路径和约束。", "skill_id": "modsdk-feasibility"},
     {"id": "audio", "name": "调音虾尾", "title": "配音与交互音效", "description": "设计 NPC 对白、物品与交互音效，复核声音资源和触发规则。", "skill_id": "minecraft-audio"},
+    {"id": "art", "name": "美术虾绘", "title": "像素贴图与特效", "description": "设计 UI 九宫格、物品贴图和序列帧，并交付资源接入合同。", "skill_id": "minecraft-art"},
     {"id": "reviewer", "name": "程序虾米", "title": "独立逻辑审查", "description": "质疑重复触发、状态同步与异常处理设计。", "skill_id": "modsdk-review"},
 ]
 

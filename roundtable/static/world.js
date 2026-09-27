@@ -9,16 +9,19 @@
     if (exiting || !opening.open) return;
     exiting = true; clearTimeout(timer); markSeen();
     const source = opening.querySelector(".craft-opening img"), target = document.querySelector(".craft-logo");
-    let flyer;
+    let flyer; const exits=[];
     try {
       if (!matchMedia("(prefers-reduced-motion: reduce)").matches && target.getBoundingClientRect().width) {
         const a = source.getBoundingClientRect(), b = target.getBoundingClientRect();
         flyer = source.cloneNode(); flyer.className = "opening-flyer";
         Object.assign(flyer.style, {left:`${a.left}px`,top:`${a.top}px`,width:`${a.width}px`,height:`${a.height}px`}); opening.append(flyer); source.style.visibility="hidden";
+        for(const [index,node] of [...opening.children].filter(n=>n!==flyer).entries()) {
+          exits.push(node.animate([{opacity:getComputedStyle(node).opacity,transform:"translateY(0)",filter:"blur(0px)"},{opacity:0,transform:"translateY(-18px)",filter:"blur(3px)"}],{duration:600,delay:Math.min(index*35,140),easing:"cubic-bezier(.22,.75,.2,1)",fill:"forwards"}));
+        }
         opening.classList.add("opening-departing"); shell.style.opacity="1";
         await flyer.animate([{transform:"translate(0,0) scale(1)"},{transform:`translate(${b.left-a.left}px,${b.top-a.top}px) scale(${b.width/a.width})`}], {duration:950,easing:"cubic-bezier(.22,.75,.2,1)",fill:"forwards"}).finished;
       }
-    } finally { flyer?.remove(); source.style.visibility=""; opening.close(); opening.classList.remove("opening-departing"); shell.style.opacity=""; exiting=false; }
+    } finally { exits.forEach(a=>a.cancel()); flyer?.remove(); source.style.visibility=""; opening.close(); opening.classList.remove("opening-departing"); shell.style.opacity=""; exiting=false; }
   };
   const play = () => { if (exiting) return; clearTimeout(timer); shell.style.opacity="0"; opening.showModal(); timer=setTimeout(dismiss, matchMedia("(prefers-reduced-motion: reduce)").matches ? 1200 : 6500); };
   document.getElementById("opening-skip").addEventListener("click", dismiss);

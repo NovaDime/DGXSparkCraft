@@ -48,9 +48,16 @@ class RoundtableEngine:
     def create(self, request: MeetingRequest) -> dict:
         if self._closing or len(self._tasks) >= self.settings.max_queued_meetings:
             raise QueueFullError("当前会议队列已满，请等待已有会议结束。")
+        parent = self.store.get(request.parent_meeting_id) if request.parent_meeting_id else None
+        if request.parent_meeting_id and (not parent or parent["status"] in {"queued", "running"}):
+            raise ValueError("原会议不存在或仍在运行，不能继续讨论")
+        if parent and not request.revision_notes.strip():
+            raise ValueError("继续讨论需要填写修改意见")
         stamp = now()
         meeting = {
             "id": uuid4().hex, "topic": request.topic, "constraints": request.constraints,
+            "parent_meeting_id": request.parent_meeting_id, "parent_proposal": parent["proposal"] if parent else "",
+            "revision_notes": request.revision_notes,
             "max_rounds": request.max_rounds, "include_reviewer": True,
             "provider_mode": self.settings.provider_mode, "status": "queued",
             "created_at": stamp, "updated_at": stamp, "current_round": 0,
@@ -148,6 +155,8 @@ class RoundtableEngine:
                        for item in meeting["issues"] if item["status"] == "open" and (phase == "synthesis" or item["owner_role_id"] == role_id)],
             "round_reviews": reviews if phase == "synthesis" else [],
             "own_open_issues": [item for item in meeting["issues"] if item["status"] == "open" and item["owner_role_id"] == role_id],
+            "previous_proposal": meeting.get("parent_proposal", ""),
+            "human_revision": meeting.get("revision_notes", ""),
             "review_goal": "先核对自己已有问题是否被当前方案解决，解决则明确关闭；只提出本职责范围内阻碍方案成立的问题，后续实测放入建议。",
             "previous_summary": next((turn["summary"] for turn in reversed(meeting["turns"]) if turn["role_id"] == "host"), "") if phase == "synthesis" else "",
             "remaining_token_budget": meeting.get("token_budget", MAX_MEETING_TOKENS) - meeting.get("budget_tokens", 0),
@@ -155,6 +164,8 @@ class RoundtableEngine:
         }
         if getattr(self, "official_knowledge", None):
             context["official_knowledge"] = self.official_knowledge.context(meeting["topic"])
+        if getattr(self, "knowledge", None):
+            context["repository_knowledge"] = self.knowledge.search_all(meeting["topic"], limit=4)
         started = time.perf_counter()
         async with asyncio.timeout(self.settings.request_timeout_seconds + 5):
             raw = await self.provider.generate(role=role, context=context)
@@ -196,7 +207,7 @@ class RoundtableEngine:
                     raise ValueError("主持者没有提供可供评审的初始方案。")
                 meeting["proposal"] = opening.proposal
                 self.store.save(meeting)
-                specialists = ["planner", "balance", "engineer", "audio", "reviewer"]
+                specialists = ["planner", "balance", "engineer", "audio", "art", "reviewer"]
                 for round_index in range(1, meeting["max_rounds"] + 1):
                     meeting["current_round"] = round_index
                     reviewed_proposal = meeting["proposal"]

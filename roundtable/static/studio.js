@@ -160,13 +160,13 @@
     finally { state.pollBusy = false; }
   }
   $("nav-development").addEventListener("click", () => switchView("development")); $("nav-knowledge").addEventListener("click", () => switchView("knowledge")); $("manage-repositories").addEventListener("click", () => { switchView("knowledge"); const id = $("job-repository").value; if (id) selectRepository(id); }); $("new-job").addEventListener("click", newJob); $("notice-close").addEventListener("click", () => { $("notice").hidden = true; }); $("job-repository").addEventListener("change", updateContext);
-  $("task").addEventListener("input", () => { $("task-count").textContent = `${$("task").value.length} / 6000`; });
+  $("task").addEventListener("input", () => { $("task-count").textContent = `${$("task").value.length} / 20000`; });
   for (const id of ["runtime", "max-repairs"]) $(id).addEventListener("change", () => { $("runtime-summary").textContent = `${$("runtime").value === "python2" ? "Python 2.7" : "Python 3"} · 最多修复 ${$("max-repairs").value} 次`; });
   $("job-form").addEventListener("submit", async (event) => {
     if ($("job-meeting").value) { event.preventDefault(); switchView("roundtable"); window.dispatchEvent(new CustomEvent("sparkcraft:open-meeting", {detail:{id:$("job-meeting").value}})); return; }
     event.preventDefault(); if (state.creating) return; const task = $("task").value.trim(); if (!task) { $("task").focus(); return; } state.creating = true; $("create-job").disabled = true; $("create-job").textContent = "正在提交…"; $("job-form-error").hidden = true;
-    try { const job = await api("/api/development/jobs", { method: "POST", body: { task, repository_id: $("job-repository").value || null, meeting_id: $("job-meeting").value || null, runtime: $("runtime").value, max_repairs: Number($("max-repairs").value) } }); const id = job.id || job.job_id; if (!id) throw new Error("服务未返回任务 ID，请刷新任务记录确认状态。"); updateHistory({ ...job, id, task: job.task || task }); selectTab("events"); await selectJob(id); notice("开发任务已提交，运行记录将自动更新。"); }
-    catch (error) { showError("job-form-error", error); } finally { state.creating = false; $("create-job").textContent = "开始开发 ↗"; $("create-job").disabled = !state.meta?.provider; }
+    try { const meeting = await api("/api/meetings", {method:"POST",body:{topic:task,constraints:$("brief-mode").value === "design" ? "用户已提供完整策划，请在保留原意的前提下核对实现与数值，未经人工确认不得制作。" : "用户仅有想法，请先完善玩法、数值和制作范围，未经人工确认不得制作。",max_rounds:Number($("rt-rounds").value)}}); switchView("roundtable"); window.dispatchEvent(new CustomEvent("sparkcraft:select-meeting",{detail:{id:meeting.id}})); notice("已进入策划圆桌，讨论结果由你审核。"); }
+    catch (error) { showError("job-form-error", error); } finally { state.creating=false; $("create-job").textContent="进入策划圆桌 ↗"; $("create-job").disabled=!state.meta?.provider; }
   });
   for (const name of ["code", "review", "events"]) {
     $("tab-" + name).addEventListener("click", () => selectTab(name));

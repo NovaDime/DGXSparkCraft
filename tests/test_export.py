@@ -29,7 +29,7 @@ class ExportTests(unittest.TestCase):
         output = self.root / "bundle"
         result = export_bundle(output, "/home/demo/roundtable", self.settings, **self.models)
         self.assertFalse(result["installed"])
-        self.assertEqual(len(result["agents"]), 6)
+        self.assertEqual(len(result["agents"]), 7)
         config = json.loads((output / "openclaw.fragment.json").read_text(encoding="utf-8"))
         self.assertEqual(config["agents"]["ownership"], "explicit")
         self.assertEqual(config["agents"]["entries"]["host"]["workspace"], "/home/demo/roundtable/workspaces/host")
@@ -72,7 +72,7 @@ class ExportTests(unittest.TestCase):
         self.assertTrue(result["dry_run"])
         self.assertFalse(result["installed"])
         self.assertFalse(result["network_contacted"])
-        self.assertEqual(len(result["agents"]), 6)
+        self.assertEqual(len(result["agents"]), 7)
         self.assertEqual(result["validation"]["signature"], "unsigned")
         self.assertEqual(result["validation"]["role_inference"], "not_run")
         self.assertNotIn("never-export-this", json.dumps(result))
@@ -134,9 +134,9 @@ class ExportTests(unittest.TestCase):
         output = self.root / "real-bundle"
         settings = Settings(skills_dir=project / "skills")
         result = export_bundle(output, "/home/demo/roundtable", settings, **self.models)
-        self.assertEqual(set(result["agents"]), {"host", "planner", "balance", "engineer", "audio", "reviewer"})
+        self.assertEqual(set(result["agents"]), {"host", "planner", "balance", "engineer", "audio", "art", "reviewer"})
         cards = list(output.glob("workspaces/*/skills/*/SKILL_CARD.json"))
-        self.assertEqual(len(cards), 6)
+        self.assertEqual(len(cards), 7)
         for path in cards:
             card = json.loads(path.read_text(encoding="utf-8"))
             self.assertEqual(path.read_bytes(), (project / "skills" / card["skill_id"] / "SKILL_CARD.json").read_bytes())
