@@ -1,11 +1,11 @@
-# SparkCraft 1.0 架构说明
+# SparkCraft 1.2 架构说明
 
 当前完整技术实现与优化说明见[项目说明文档](项目说明文档.md)、[部署说明](部署说明.md)及[技术栈说明](技术栈说明.md)。本页替换旧版五角色、仅方案讨论的历史描述。
 
 ```mermaid
 flowchart TD
     UI[浏览器 Studio] --> API[FastAPI 宿主]
-    API --> RT[六角色圆桌与问题台账]
+    API --> RT[七角色圆桌与问题台账]
     API --> KNOW[官方前置知识 / 用户代码 / 人工经验]
     KNOW --> RT
     RT --> APPROVE[人工审核任务单]
@@ -19,7 +19,7 @@ flowchart TD
     API --> DB[SQLite 状态与本机工作目录]
 ```
 
-- `engine.py`：轮次、问题归属、预算、取消与持久化。配置3–1000轮；最多1M累计token预算。
+- `engine.py`：轮次、问题归属、预算、取消与持久化。配置3–1000轮；单次上下文最多1M token，累计用量独立统计。
 - `providers.py`、`agent_models.py`、`cloud_models.py`：真实/模拟模式分离，角色路由与云端连接。
 - `skills.py`、`skills/`：角色专业规范、示例与输入指纹。
 - `official_knowledge.py`、`knowledge.py`、`documents.py`：默认资料、项目检索与文档识别。

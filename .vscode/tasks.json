@@ -1,9 +1,24 @@
 {
   "version": "2.0.0",
   "tasks": [
-    {"label": "SparkCraft: OpenClaw Gateway", "type": "process", "command": "${workspaceFolder}/.venv/bin/python", "args": ["scripts/setup_local_openclaw.py", "--start"], "problemMatcher": []},
-    {"label": "SparkCraft: Development Studio", "type": "process", "command": "${workspaceFolder}/.venv/bin/python", "args": ["scripts/run_studio.py"], "problemMatcher": []},
-    {"label": "SparkCraft: Offline Simulation", "type": "process", "command": "${workspaceFolder}/.venv/bin/python", "args": ["scripts/run_studio.py", "--simulation", "--port", "8766"], "problemMatcher": []},
-    {"label": "SparkCraft: Regression Tests", "type": "process", "command": "${workspaceFolder}/.venv/bin/python", "args": ["-m", "unittest", "discover", "-s", "tests", "-v"], "problemMatcher": []}
+    {
+      "label": "SparkCraft: OpenClaw Gateway",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "scripts/setup_local_openclaw.py",
+        "--start"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "SparkCraft: Development Studio",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "scripts/run_studio.py"
+      ],
+      "problemMatcher": []
+    }
   ]
 }

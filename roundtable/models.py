@@ -15,6 +15,7 @@ class MeetingRequest(BaseModel):
     constraints: str = Field(default="", max_length=4000)
     parent_meeting_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$")
     revision_notes: str = Field(default="", max_length=2000)
+    auto_converge: bool = True
     max_rounds: int = Field(default=DEFAULT_ROUNDS, ge=MIN_ROUNDS, le=MAX_ROUNDS, strict=True)
 
 

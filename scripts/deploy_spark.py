@@ -5,7 +5,9 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shlex
+import shutil
 import socket
 import subprocess
 import sys
@@ -44,7 +46,33 @@ def available_model():
         raise RuntimeError('8000 上已有模型服务，但不是指定 Nemotron；未覆盖。')
     except (OSError, ValueError, KeyError): return None
 
+def model_progress_text(log):
+    """Report observed work, never invent a time-based completion percentage."""
+    if 'Application startup complete' in log:
+        return '[2/5 模型] 服务已启动，验证 API'
+    if any(x in log for x in ('Warming up', 'warmup run', 'Capturing CUDA', 'torch.compile', 'GPU KV cache')):
+        return '[2/5 模型] 权重已加载，正在编译或预热推理引擎'
+    matches = re.findall(r'Loading safetensors checkpoint shards:\s*(\d+)%[^\r\n]*?\|\s*(\d+)/(\d+)', log)
+    if matches:
+        percent, done, total = matches[-1]
+        return f'[2/5 模型] 权重加载 {percent}% · {done}/{total} 个分片（后续还需引擎预热）'
+    if 'Downloading' in log or 'Fetching' in log:
+        return '[2/5 模型] 正在下载或检查模型文件'
+    return '[2/5 模型] 正在初始化模型服务'
+
+def report_model_progress(container, previous):
+    try:
+        start = subprocess.run(['docker','inspect','--format','{{.State.StartedAt}}',container],capture_output=True,text=True,timeout=5)
+        if start.returncode: return previous
+        logs = subprocess.run(['docker','logs','--since',start.stdout.strip(),'--tail','100',container],capture_output=True,text=True,timeout=5)
+        message = model_progress_text(logs.stdout + logs.stderr)
+    except (OSError, subprocess.TimeoutExpired):
+        message = '[2/5 模型] 正在启动，暂时无法读取详细进度'
+    if message != previous: print(message, flush=True)
+    return message
+
 def provision_model(timeout):
+    print('[2/5 模型] 检查本地模型',flush=True)
     model = available_model()
     if model:
         print('复用本机 Nemotron：' + model)
@@ -63,10 +91,16 @@ def provision_model(timeout):
                 if busy.stdout.strip(): raise RuntimeError('GPU 已被其他计算任务使用，未启动原容器')
                 run(['docker','start','nemotron-3.5-lightning'])
             print('等待已有 Nemotron 容器加载，复用原权重缓存。',flush=True)
-            deadline=time.monotonic()+timeout
+            deadline=time.monotonic()+timeout; progress=None
             while time.monotonic()<deadline:
                 model=available_model()
-                if model:return model
+                if model:
+                    print('Nemotron 模型 API 已就绪。',flush=True)
+                    return model
+                state=subprocess.run(['docker','inspect','--format','{{.State.Status}}','nemotron-3.5-lightning'],capture_output=True,text=True)
+                if state.returncode == 0 and state.stdout.strip() in {'exited','dead'}:
+                    raise RuntimeError('原模型容器已停止，请检查 docker logs nemotron-3.5-lightning')
+                progress=report_model_progress('nemotron-3.5-lightning',progress)
                 time.sleep(5)
             raise RuntimeError('原模型容器尚未就绪，请检查 docker logs nemotron-3.5-lightning')
     # Only resume a container whose explicit label and model match this installer.
@@ -91,12 +125,14 @@ def provision_model(timeout):
             run(model_command())
     print('等待 Nemotron 模型接口就绪；首次下载或加载可能较久。', flush=True)
     deadline = time.monotonic() + timeout
+    progress = None
     while time.monotonic() < deadline:
         model = available_model()
         if model: return model
         state = subprocess.run(['docker', 'inspect', '--format', '{{.State.Status}}', 'sparkcraft-nemotron-3-5'], capture_output=True, text=True)
         if state.returncode == 0 and state.stdout.strip() in {'exited','dead'}:
             raise RuntimeError('模型容器已停止，请检查 docker logs sparkcraft-nemotron-3-5；未无限等待。')
+        progress=report_model_progress('sparkcraft-nemotron-3-5',progress)
         time.sleep(5)
     raise RuntimeError('模型尚未就绪（首次下载较慢）。查看 docker logs sparkcraft-nemotron-3-5，等待后重新部署；未停止容器。')
 
@@ -106,7 +142,13 @@ def install_node():
     if executable.exists():
         version = run([executable, '--version'], capture_output=True, text=True).stdout.strip()
         if version != 'v'+NODE: raise RuntimeError('项目 Node 版本不符，未覆盖：'+version)
-        return
+        return executable
+    system_node = shutil.which('node')
+    if system_node:
+        probe = subprocess.run([system_node, '--version'],capture_output=True,text=True)
+        if probe.returncode == 0 and probe.stdout.strip() == 'v'+NODE:
+            print('复用已安装的 Node '+NODE,flush=True)
+            return Path(system_node)
     dest.parent.mkdir(parents=True, exist_ok=True)
     archive = 'node-v'+NODE+'-linux-arm64.tar.xz'
     base = 'https://nodejs.org/dist/v'+NODE+'/'
@@ -120,6 +162,7 @@ def install_node():
         if actual != expected: raise RuntimeError('Node SHA256 校验失败')
         with tarfile.open(temporary/archive) as bundle: bundle.extractall(temporary, filter='data')
         (temporary/archive.removesuffix('.tar.xz')).rename(dest)
+    return executable
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
@@ -139,12 +182,18 @@ def main(argv=None):
         raise RuntimeError('此部署入口仅支持 DGX Spark Linux ARM64。')
     if sys.version_info < (3,12): raise RuntimeError('需要 Python 3.12+（含 venv）。')
     model = provision_model(args.model_timeout)
-    install_node()
-    env = {**os.environ, 'PATH': str(ROOT/'.runtime/node/bin')+os.pathsep+os.environ.get('PATH','')}
+    print('[3/5 依赖] 准备 Node、OpenClaw 和 Python 运行环境',flush=True)
+    node = install_node()
+    env = {**os.environ, 'PATH': str(node.parent)+os.pathsep+os.environ.get('PATH','')}
     prefix = ROOT/'.runtime/openclaw'
     package = prefix/'lib/node_modules/openclaw/package.json'
     if not package.exists():
-        run([ROOT/'.runtime/node/bin/npm', 'install', '-g', '--prefix', prefix, 'openclaw@'+OPENCLAW], env=env)
+        global_claw=shutil.which('openclaw',path=env['PATH'])
+        probe=subprocess.run([global_claw,'--version'],capture_output=True,text=True,env=env) if global_claw else None
+        if probe and probe.returncode == 0 and ('OpenClaw '+OPENCLAW+' ') in (probe.stdout.strip()+' '):
+            print('复用已安装的 OpenClaw '+OPENCLAW,flush=True)
+        else:
+            run([node.parent/'npm', 'install', '-g', '--prefix', prefix, 'openclaw@'+OPENCLAW], env=env)
     elif json.loads(package.read_text())['version'] != OPENCLAW:
         raise RuntimeError('项目 OpenClaw 版本不符，未覆盖。')
     python = ROOT/'.venv/bin/python'

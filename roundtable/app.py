@@ -65,6 +65,7 @@ def create_app(settings: Settings | None = None, provider=None) -> FastAPI:
         delivery = None
         official = None
         official_sync = None
+        skill_learning = None
         try:
             catalog = SkillCatalog(config.skills_dir)
             catalog.all()  # Fail startup early if the project's professional skills are missing.
@@ -89,6 +90,10 @@ def create_app(settings: Settings | None = None, provider=None) -> FastAPI:
             app.state.catalog = catalog
             app.state.knowledge = knowledge
             app.state.development = development
+            from .skill_learning import SkillLearning
+            skill_learning = SkillLearning(config, knowledge, model_provider, engine._lane)
+            catalog.learning = skill_learning
+            app.state.skill_learning = skill_learning
             delivery = DeliveryEngine(config, development, store, model_provider, app.state.model_routes)
             app.state.delivery = delivery
             if provider is None and config.provider_mode != "simulation" and not official.meta_path.exists():
@@ -100,6 +105,8 @@ def create_app(settings: Settings | None = None, provider=None) -> FastAPI:
                 official_sync.cancel()
                 import asyncio
                 await asyncio.gather(official_sync, return_exceptions=True)
+            if skill_learning:
+                await skill_learning.close()
             if delivery:
                 await delivery.close()
             if development:
@@ -177,6 +184,12 @@ def create_app(settings: Settings | None = None, provider=None) -> FastAPI:
             return request.app.state.catalog.get(skill_id)
         except KeyError:
             raise HTTPException(404, "未找到该 Skill") from None
+
+    @app.get("/api/connections")
+    async def connection_status(request: Request):
+        import asyncio
+        from scripts.connection_probe import probe
+        return await asyncio.to_thread(probe, Path(__file__).resolve().parent.parent, request.app.state.settings.data_dir)
 
     @app.post("/api/provider/check")
     async def provider_check(request: Request):

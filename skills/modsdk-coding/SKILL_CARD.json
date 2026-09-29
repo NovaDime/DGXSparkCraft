@@ -23,13 +23,12 @@
     "SKILL.md",
     "references/api-evidence.md",
     "references/validation.md",
-    "scripts/validate_modsdk.py",
-    "evals/evals.json"
+    "scripts/validate_modsdk.py"
   ],
   "trust": {
     "evaluation": {
-      "status": "behavior_tests_passed",
-      "evidence": "evals/test_validation.py: 11 deterministic tool behavior tests; does not measure model quality."
+      "status": "not_included_in_release",
+      "evidence": null
     },
     "signature": {
       "status": "unsigned",

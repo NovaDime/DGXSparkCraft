@@ -1,9 +1,21 @@
 (() => {
   "use strict";
   const $ = id => document.getElementById(id);
-  const labels = {queued:"排队中",running:"讨论中",completed:"达成共识",needs_review:"仍需评审",failed:"运行失败",cancelled:"已停止",interrupted:"已中断"};
+  const labels = {queued:"排队中",running:"讨论中",completed:"方案已定稿 · 待你审核",needs_review:"方案待取舍",failed:"运行失败",cancelled:"已停止",interrupted:"已中断"};
   let roles = [], selected = null, meeting = null, busy = false, version = 0, modelCatalog = [], openedRole = null;
   let productionRole = null;
+  let roundPage = null;
+  const pager = document.createElement('nav'); pager.className='rt-pager'; pager.setAttribute('aria-label','讨论轮次翻页');
+  const prevPage=document.createElement('button'), nextPage=document.createElement('button'), pageLabel=document.createElement('span'), livePage=document.createElement('button');
+  for(const b of [prevPage,nextPage,livePage]) { b.type='button'; b.className='button secondary small'; }
+  prevPage.textContent='← 上一轮'; nextPage.textContent='下一轮 →'; livePage.textContent='跟随最新轮次';
+  pager.append(prevPage,pageLabel,nextPage,livePage); document.getElementById('rt-turns').before(pager);
+  prevPage.onclick=()=>{roundPage=Math.max(0,(roundPage ?? meeting.current_round)-1);render();};
+  nextPage.onclick=()=>{roundPage=Math.min(meeting.current_round,(roundPage ?? meeting.current_round)+1);render();};
+  livePage.onclick=()=>{roundPage=null;render();};
+  const issuePanel=document.createElement('details');issuePanel.className='advanced rt-issue-panel';
+  const issueHeading=document.createElement('summary');issueHeading.textContent='需要解决的问题';issuePanel.append(issueHeading,document.getElementById('rt-issues'));pager.before(issuePanel);
+
   $("rt-go-brief").onclick=()=>$("nav-development").click();
   $("rt-form").after($("rt-form-error"));
   const node = (tag, cls, text) => { const n = document.createElement(tag); n.className = cls; if (text != null) n.textContent = text; return n; };
@@ -96,16 +108,22 @@
     if (!meeting) return; const m = meeting;
     $("rt-empty").hidden = true; $("rt-output").hidden = false; $("rt-title").textContent = m.topic; $("rt-status").textContent = labels[m.status] || m.status;
     const active = roles.find(r => r.id === m.active_role_id);
-    $("rt-progress").textContent = `${m.provider_mode === "simulation" ? "规则模拟 · 非 AI 推理" : "模型评审"} · 第 ${m.current_round} / ${m.max_rounds} 轮 · ${m.turns.length} 次发言${active ? ` · ${active.name}正在发言` : ""} · 保守预算 ${Number(m.budget_tokens || 0).toLocaleString()} / 1,000,000 token`;
+    $("rt-progress").textContent = `${m.provider_mode === "simulation" ? "规则模拟 · 非 AI 推理" : "协作设计"} · 第 ${m.current_round} / ${m.max_rounds} 轮 · ${m.turns.length} 次发言${active ? ` · ${active.name}正在发言` : ""} · 累计用量 ${Number(m.budget_tokens || 0).toLocaleString()} token（含估算） · 单次上下文上限 1M`;
     $("rt-cancel").hidden = !["queued","running"].includes(m.status); $("rt-develop").hidden = m.status !== "completed";
     $("rt-export").href = `/api/meetings/${encodeURIComponent(m.id)}/export?format=markdown`;
     $("rt-error").hidden = !m.error; $("rt-error").textContent = m.error || "";
-    const signature = `${m.id}:${m.turns.length}`;
+    const currentPage=Math.min(roundPage ?? m.current_round,m.current_round);
+    pageLabel.textContent=currentPage===0 ? '开场提案' : `第 ${currentPage} 轮 / 已进行 ${m.current_round} 轮`;
+    prevPage.disabled=currentPage===0;nextPage.disabled=currentPage>=m.current_round;
+    livePage.hidden=roundPage===null;
+    issueHeading.textContent=`需要解决的问题 · ${m.issues.filter(i=>i.status==='open').length} 项待复核（全场）`;
+    const signature = `${m.id}:${m.turns.length}:${currentPage}`;
     if ($("rt-turns").dataset.signature !== signature) {
       $("rt-turns").dataset.signature = signature; $("rt-turns").replaceChildren();
-      for (const turn of m.turns) {
+      for (const turn of m.turns.filter(t=>t.round===currentPage)) {
         const card = node("article", `rt-turn ${turn.role_id}`);
-        card.append(node("small", "", turn.phase === "opening" ? "开场提案" : `第 ${turn.round} 轮 · ${turn.stance === "approve" ? "认可" : "建议修订"}`), node("h3", "", turn.role_name), node("p", "", turn.summary));
+        card.append(node("small", "", turn.phase === "opening" ? "开场提案" : `第 ${turn.round} 轮 · ${turn.stance === "approve" ? "认可" : "补充方案"}`), node("h3", "", turn.role_name), node("p", "", turn.summary));
+        if (turn.proposal) { const contribution=node('details','advanced'), heading=node('summary','','本轮方案贡献'), body=node('pre','',turn.proposal); contribution.append(heading,body);card.append(contribution); }
         if (turn.recommendations?.length) { const list = node("ul", ""); for (const text of turn.recommendations) list.append(node("li", "", text)); card.append(list); }
         $("rt-turns").append(card);
       }
@@ -121,24 +139,31 @@
     }
   }
   window.addEventListener("sparkcraft:production",e=>{productionRole=e.detail.role || null;renderRoles();});
-  async function select(id) { productionRole=null; selected = id; const v = ++version; const m = await api(`/api/meetings/${encodeURIComponent(id)}`); if (v !== version) return; meeting = m; render(); await historyList(); }
+  async function select(id) { if(selected!==id) roundPage=null; productionRole=null; selected = id; const v = ++version; const m = await api(`/api/meetings/${encodeURIComponent(id)}`); if (v !== version) return; meeting = m; const link=new URL(location.href);link.searchParams.set('meeting',id);history.replaceState(null,'',link);render(); await historyList(); }
   const revisionForm = node("form", "panel");
   revisionForm.id="rt-revision-form";
   revisionForm.innerHTML='<label for="rt-revision-notes">对方案不满意？提出修改后继续讨论</label><textarea id="rt-revision-notes" minlength="4" maxlength="2000" rows="3" required placeholder="例如：降低奖励，保留冷却机制，改用原版贴图"></textarea><button class="button secondary" type="submit">提出修改 · 继续讨论</button>';
   $("rt-output").append(revisionForm);
-  revisionForm.onsubmit=async e=>{e.preventDefault();if(!meeting || ["running","queued"].includes(meeting.status))return; const button=revisionForm.querySelector('button');button.disabled=true;try{const next=await api('/api/meetings',{topic:meeting.topic,constraints:meeting.constraints || '',max_rounds:Number($("rt-rounds").value),parent_meeting_id:meeting.id,revision_notes:$("rt-revision-notes").value});await select(next.id);$("rt-revision-notes").value='';}catch(e){error(e);}finally{button.disabled=false;}};
+  const convergeButton=node('button','button secondary','继续收敛复核'); convergeButton.type='button'; revisionForm.prepend(convergeButton);
+  convergeButton.onclick=async()=>{if(!meeting || ['running','queued'].includes(meeting.status))return;convergeButton.disabled=true;try{
+    const open=meeting.issues.filter(i=>i.status==='open');
+    const notes='保持原需求范围，主持人先补全上一版方案，以明确默认规则解决已有问题，再由原提出者复核；不要重复泛泛质疑或新增无关功能。优先处理：'+open.map(i=>i.title).join('；');
+    const next=await api('/api/meetings',{topic:meeting.topic,constraints:meeting.constraints || '',max_rounds:Number($('rt-rounds').value),auto_converge:true,parent_meeting_id:meeting.id,revision_notes:notes.slice(0,2000)});await select(next.id);
+  }catch(e){error(e);}finally{convergeButton.disabled=false;}};
+
+  revisionForm.onsubmit=async e=>{e.preventDefault();if(!meeting || ["running","queued"].includes(meeting.status))return; const button=revisionForm.querySelector('button[type=submit]');button.disabled=true;try{const next=await api('/api/meetings',{topic:meeting.topic,constraints:meeting.constraints || '',max_rounds:Number($("rt-rounds").value),auto_converge:$("rt-auto-converge").checked,parent_meeting_id:meeting.id,revision_notes:$("rt-revision-notes").value});await select(next.id);$("rt-revision-notes").value='';}catch(e){error(e);}finally{button.disabled=false;}};
   window.addEventListener("sparkcraft:select-meeting", async event=>{try{await select(event.detail.id);}catch(e){error(e);}});
   $("rt-form").addEventListener("submit", async event => {
     event.preventDefault(); $("rt-start").disabled = true; $("rt-form-error").hidden = true;
-    try { const m = await api("/api/meetings", {topic:$("rt-topic").value.trim(), constraints:$("rt-constraints").value.trim(), max_rounds:Number($("rt-rounds").value)}); await select(m.id); $("rt-output").scrollIntoView({behavior:"smooth",block:"start"}); }
+    try { const m = await api("/api/meetings", {topic:$("rt-topic").value.trim(), constraints:$("rt-constraints").value.trim(), max_rounds:Number($("rt-rounds").value),auto_converge:$("rt-auto-converge").checked}); await select(m.id); $("rt-output").scrollIntoView({behavior:"smooth",block:"start"}); }
     catch(e) { error(e); } finally { $("rt-start").disabled = false; }
   });
   $("rt-refresh").addEventListener("click", () => historyList().catch(error));
   $("rt-cancel").addEventListener("click", async () => { const id = selected; if (!id) return; try { await api(`/api/meetings/${encodeURIComponent(id)}/cancel`, {}); if (selected === id) await select(id); } catch(e) { error(e); } });
-  $("rt-develop").textContent = "人工审核与制作 ↗";
+  $("rt-develop").textContent = "审核方案并开始制作 ↗";
   window.addEventListener("sparkcraft:open-meeting", async event => { try { await select(event.detail.id); window.dispatchEvent(new CustomEvent("sparkcraft:delivery", {detail:{id:meeting.id}})); } catch(e) { error(e); } });
   $("rt-develop").addEventListener("click", () => { if (meeting?.status === "completed") window.dispatchEvent(new CustomEvent("sparkcraft:delivery", {detail:{id:meeting.id}})); });
-  async function boot() { try { const data = await api("/api/agents"); roles = data.roles; modelCatalog = data.models; renderRoles(); await historyList(); $("rt-start").disabled = false; } catch(e) { error(e); } }
+  async function boot() { try { const data = await api("/api/agents"); roles = data.roles; modelCatalog = data.models; renderRoles(); await historyList(); const requested=new URL(location.href).searchParams.get('meeting'); if(requested && /^[a-f0-9]{32}$/.test(requested)) await select(requested); $("rt-start").disabled = false; } catch(e) { error(e); } }
   setInterval(async () => { if (busy || !selected || $("roundtable-view").hidden || document.hidden || !["running","queued"].includes(meeting?.status)) return; busy = true; const id = selected, v = version; try { const m = await api(`/api/meetings/${encodeURIComponent(id)}`); if (v === version) { meeting = m; render(); if (!["running","queued"].includes(m.status)) await historyList(); } } catch(e) { error(e); } finally { busy = false; } }, 2500);
   boot();
 })();

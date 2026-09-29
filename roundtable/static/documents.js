@@ -30,13 +30,17 @@
       const count = Number(source?.document_count) || 0;
       const characters = Number(source?.character_count) || 0;
       const indexed = count > 0 && characters > 0;
-      const labels = {guide_snapshot: '开发指南全文快照（固定仓库版本）', guide_snapshot_partial: '开发指南快照（存在未下载文章）', partial: '已索引部分官方正文', reference_snapshot: '已索引固定版本参考片段（非主站正文）'};
+      const labels = {offline_snapshot: '离线文档正文已索引', guide_snapshot: '开发指南全文快照（固定仓库版本）', guide_snapshot_partial: '开发指南快照（存在未下载文章）', partial: '已索引部分官方正文', reference_snapshot: '已索引固定版本参考片段（非主站正文）'};
       card.querySelector('.official-index-status').textContent = indexed
         ? `${labels[source.status] || '已缓存部分资料'} · ${count} 篇 · ${characters.toLocaleString()} 字符`
         : source?.status === 'baseline_only' ? '基础规则已预置 · 官方正文尚未索引' : '正文索引尚未就绪 · 可尝试更新索引';
     }
     $('official-knowledge-message').textContent = data.message || '官方入口与正文索引分别管理，索引范围以实际获取的正文为准。';
   }
+  const uploadForm=document.createElement('form');
+  uploadForm.innerHTML='<label>上传文档，自动供本地模型使用<input type="file" accept=".zip,.html,.htm,.md,.txt,.pdf,.docx" required></label><button class="button primary">上传并建立知识索引</button><p role="status">支持离线文档 ZIP（64 MiB 内）。自动解析、索引，后续圆桌与编码自动检索，不修改模型权重。</p>';
+  $('official-knowledge-message').after(uploadForm);
+  uploadForm.onsubmit=async e=>{e.preventDefault();const file=uploadForm.querySelector('input').files[0];if(!file)return;const button=uploadForm.querySelector('button'),status=uploadForm.querySelector('p');button.disabled=true;status.textContent='正在上传、提取正文并建立本地索引…';try{const r=await api('/api/official-knowledge/upload?filename='+encodeURIComponent(file.name),file,true);status.textContent=`已完成：${r.documents} 篇文档。${r.message}`;await loadOfficial();}catch(e){status.textContent=e.message;}finally{button.disabled=false;}};
   async function loadOfficial() { renderOfficial(await api('/api/official-knowledge')); }
   $('knowledge-minecraft').onclick = () => chooseGame('minecraft');
   $('knowledge-other').onclick = () => chooseGame('other');

@@ -22,6 +22,12 @@ class FeedbackRequest(BaseModel):
     evidence: str | dict | None = None
 
 
+class LearningSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    version: int | None = Field(default=None, ge=1)
+    enabled: StrictBool | None = None
+
+
 class ReviewFeedbackRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     accepted: StrictBool
@@ -48,7 +54,9 @@ def create_knowledge_router() -> APIRouter:
 
     @router.post("/import", status_code=201)
     async def import_repository(body: ImportRequest, request: Request):
-        return await _call(request.app.state.knowledge.import_path, body.path, body.name)
+        item = await _call(request.app.state.knowledge.import_path, body.path, body.name)
+        request.app.state.skill_learning.schedule(item["id"])
+        return item
 
     @router.post("/upload", status_code=201)
     async def upload_repository(request: Request, name: str = Query("uploaded-repository", min_length=1, max_length=120)):
@@ -57,7 +65,9 @@ def create_knowledge_router() -> APIRouter:
             if len(payload) + len(chunk) > MAX_UPLOAD_BYTES:
                 raise HTTPException(413, "ZIP 上传不得超过 20 MiB。")
             payload.extend(chunk)
-        return await _call(request.app.state.knowledge.import_zip, bytes(payload), name)
+        item = await _call(request.app.state.knowledge.import_zip, bytes(payload), name)
+        request.app.state.skill_learning.schedule(item["id"])
+        return item
 
     @router.get("/{repository_id}")
     async def repository_detail(repository_id: str, request: Request):
@@ -68,7 +78,34 @@ def create_knowledge_router() -> APIRouter:
 
     @router.post("/{repository_id}/reindex")
     async def reindex_repository(repository_id: str, request: Request):
-        return await _call(request.app.state.knowledge.reindex, repository_id)
+        item = await _call(request.app.state.knowledge.reindex, repository_id)
+        request.app.state.skill_learning.schedule(item["id"])
+        return item
+
+    @router.get("/{repository_id}/skill-learning")
+    async def learning_status(repository_id: str, request: Request):
+        try: return request.app.state.skill_learning.detail(repository_id)
+        except KeyError: raise HTTPException(404, "代码库不存在") from None
+
+    @router.post("/{repository_id}/skill-learning")
+    async def learn_repository(repository_id: str, request: Request):
+        try: return request.app.state.skill_learning.schedule(repository_id, force=True)
+        except KeyError: raise HTTPException(404, "代码库不存在") from None
+
+    @router.patch("/{repository_id}/skill-learning")
+    async def select_learning(repository_id: str, body: LearningSelection, request: Request):
+        try: return request.app.state.skill_learning.select(repository_id, **body.model_dump())
+        except KeyError: raise HTTPException(404, "代码库不存在") from None
+        except ValueError: raise HTTPException(400, "学习版本不存在") from None
+
+    @router.get("/{repository_id}/skill-learning/download")
+    async def download_learning(repository_id: str, request: Request):
+        from fastapi.responses import FileResponse
+        learning=request.app.state.skill_learning
+        try: item=learning.state(repository_id)
+        except KeyError: raise HTTPException(404, "代码库不存在") from None
+        if not item['active_version']: raise HTTPException(404, "尚未生成学习版本")
+        return FileResponse(learning.root/repository_id/f'v{item["active_version"]}.md',filename='repository-skill-supplement.md',media_type='text/markdown')
 
     @router.get("/{repository_id}/search")
     async def search_repository(repository_id: str, request: Request,

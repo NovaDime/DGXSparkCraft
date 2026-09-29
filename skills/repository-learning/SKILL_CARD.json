@@ -21,13 +21,12 @@
   "data_boundary": "Imported source and reviewed experience stay in local storage; model context is sent only to the configured inference route. Verify provider endpoints before importing confidential material.",
   "references": [
     "SKILL.md",
-    "references/learning-records.md",
-    "evals/evals.json"
+    "references/learning-records.md"
   ],
   "trust": {
     "evaluation": {
-      "status": "scenarios_defined_not_run",
-      "evidence": "evals/evals.json"
+      "status": "not_included_in_release",
+      "evidence": null
     },
     "signature": {
       "status": "unsigned",

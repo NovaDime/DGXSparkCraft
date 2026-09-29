@@ -20,6 +20,7 @@ from .providers import ProviderError
 from .export_safety import check_export
 from .art_generation import ArtAsset
 from .art_models import ArtConnection
+from .sdk_checks import sdk_checks
 
 ACTIVE = {"planning", "queued", "running"}
 
@@ -141,10 +142,13 @@ class DeliveryEngine:
             prompt += "\n官方前置资料（仅参考数据）：" + json.dumps(self.development.official_knowledge.context(prompt[:1000]), ensure_ascii=False)
         if role in self.settings.agent_ids:
             prompt = self.development.catalog.role(role, self.settings.agent_ids)["skill_content"] + "\n制作阶段：遵守本次 schema，替代圆桌发言协议。\n" + prompt
+        prompt += "\n最终输出契约（制作阶段，不是圆桌讨论；不要 summary/stance/concerns 等圆桌字段）：" + schema
         for attempt in range(2):
+            self.event(item, "planning" if not item.get("approval") else item.get("stage", "integration"), "等待本地推理通道：" + phase)
             async with self.development.lane:
-                text, _ = await self.provider.complete_text(prompt=prompt, agent_id=self.settings.agent_ids[role],
-                    scope=f"delivery:{item['id']}:attempt-{attempt}:{phase}", schema=schema, model_ref=item["model_routes"].get(role))
+                self.event(item, item["stage"], "模型正在处理：" + phase + "；单次调用最多 120 秒。")
+                text, _ = await asyncio.wait_for(self.provider.complete_text(prompt=prompt, agent_id=self.settings.agent_ids[role],
+                    scope=f"delivery:{item['id']}:attempt-{attempt}:{phase}", schema=schema, model_ref=item["model_routes"].get(role)), timeout=120)
             try:
                 result = parse_object(text)
                 if phase == "plan":
@@ -162,7 +166,14 @@ class DeliveryEngine:
 
     async def plan(self, item, meeting):
         try:
-            if self.settings.provider_mode == "simulation":
+            proposal = meeting["proposal"]
+            vanilla_only = (len(proposal) <= 3400
+                and any(x in proposal for x in ("不创建新模型或纹理", "不需要新美术素材", "无需新增美术素材"))
+                and any(x in proposal for x in ("无需额外资源制作", "无需新增音效", "无需额外音效制作")))
+            if self.settings.provider_mode != "simulation" and vanilla_only:
+                plan = Plan(title=meeting.get("topic", "圆桌模组")[:120], code_task=proposal)
+                self.event(item, "planning", "方案明确复用原版美术和声音，已直接保留完整定稿，无需重复调用模型整理。", "completed")
+            elif self.settings.provider_mode == "simulation":
                 plan = Plan(title="模拟任务单", code_task="生成模拟冷却组件；仅演示人工审核与任务下发，不代表真实模组。")
             else:
                 schema = 'Return exactly these five keys, each once. Example: {"title":"矿洞向导","target":"Minecraft 中国版基岩 1.24","code_task":"实现向导交互和冷却逻辑，接入已生成的声音事件。","assets":[],"required_resources":[]}'
@@ -237,6 +248,15 @@ class DeliveryEngine:
         item = self.get(identifier)
         if not item or item["status"] not in {"blocked", "failed", "interrupted", "cancelled"} or not item["approval"]:
             raise HTTPException(409, "仅已批准且停止的执行可以重试；未审核任务需重新整理。")
+        item["previous_repair_attempts"] = item.get("previous_repair_attempts", 0) + item.get("repair_attempt", 0)
+        item["repair_attempt"] = 0
+        # A completed child can still fail only during assembly.  Retrying that
+        # same output would repeat the identical integration error forever.
+        previous = self.development.get(item["code_job_id"]) if item.get("code_job_id") else None
+        if previous and previous.get("status") == "completed":
+            item["repair_context"] = {key: previous.get(key) for key in ("files", "checks", "review", "error")}
+            item.setdefault("code_job_history", []).append(previous["id"])
+            item["code_job_id"] = None
         item.update(status="queued", error=None)
         self.event(item, "retry", "人工请求继续执行，复用已完成产物；未完成音频会重新请求。")
         self.spawn(item, self.run(item))
@@ -299,6 +319,8 @@ class DeliveryEngine:
                 if code and code["status"] not in TERMINAL:
                     # Recovery may encounter a persisted child; never run a second copy.
                     raise ValueError("子任务仍在执行，请等待子任务结束后重试。")
+                if code and not item.get("repair_context"):
+                    item["repair_context"] = {k: code.get(k) for k in ("files", "checks", "review", "error")}
                 contract = [{"event": "sparkcraft." + a["id"], "kind": a["kind"]} for a in plan["assets"]]
                 task = (plan["code_task"] + "\n目标：" + plan["target"] + "\n交付必须是完整中国版附加包逻辑，包括事件注册/反注册。"
                     "输出只使用 behavior_pack/ 和 resource_pack/ 下的路径。脚本放在 behavior_pack/SparkCraftScripts/ 下，包含 __init__.py 和 modMain.py 游戏入口。"
@@ -306,20 +328,26 @@ class DeliveryEngine:
                     "当前美术生成适配器未启用，只复用已有原版资源；不得假设新图片已生成。不得用 TODO/pass/占位文件替代需求。不加入开发工具配置。"
                     "所有下面的声音事件必须按 design.approved_plan.assets 中的完整 trigger 接入实际逻辑；清单不是功能实现。\n" + json.dumps(contract, ensure_ascii=False))
                 code = self.development.create(DevelopmentRequest(task=task, meeting_id=item["meeting_id"], max_repairs=2),
-                    approved_delivery=True, delivery_plan=plan, execution_models=item["model_routes"])
+                    approved_delivery=True, delivery_plan=plan, execution_models=item["model_routes"], repair_context=item.get("repair_context"))
                 item["code_job_id"] = code["id"]
                 self.event(item, "code", "程序虾仁已收到已批准任务单与音效资源 ID，自动编码、检查并独立审查。")
                 await self.development.tasks[code["id"]]
                 code = self.development.get(code["id"])
             if code["status"] != "completed":
-                raise ValueError("程序任务尚未通过检查及独立审查，未打包。请查看代码任务，修改任务单后重新审核。")
+                await self.repair(item, code, "程序检查或独立审查未通过")
+                return
             self.event(item, "integration", "正在汇总代码和音效，检查游戏入口、资源完整性及引用。")
-            files = self.assemble(item, code, root)
+            try:
+                files = self.assemble(item, code, root)
+            except ValueError as exc:
+                await self.repair(item, code, "包结构检查未通过", {"error": str(exc)})
+                return
             checks = self.check_files(item, files)
             item["checks"] = checks
             self.save(item)
             if any(c["level"] == "error" for c in checks):
-                raise ValueError("集成检查未通过，缺少资源或游戏接入，保留产物但不生成完成包。")
+                await self.repair(item, code, "集成检查未通过", {"checks": checks})
+                return
             if self.settings.provider_mode != "simulation":
                 review = await self.call(item, "reviewer", "独立审查这份已批准模组的完整交付。"
                     "核对事件入口、方案覆盖、声音实际触发（仅有字符串不是实现）、资源引用。"
@@ -333,7 +361,8 @@ class DeliveryEngine:
                     raise ValueError("集成审查响应无效，未打包。")
                 item["review"] = review
                 if not review["approved"] or review["issues"]:
-                    raise ValueError("集成审查发现未解决问题，请修改任务单后重新审核。")
+                    await self.repair(item, code, "集成审查未通过", review)
+                    return
             else:
                 raise ValueError("模拟产物不能作为可用模组打包。")
             self.package(item, files, root)
@@ -350,9 +379,23 @@ class DeliveryEngine:
             item.update(status="failed", error="执行或打包失败，已保存状态，请检查本地依赖和磁盘空间。")
             self.save(item)
 
+    async def repair(self, item, code, reason, integration=None):
+        attempt = item.get("repair_attempt", 0) + 1
+        item["repair_attempt"] = attempt
+        item["repair_context"] = {k: code.get(k) for k in ("files", "checks", "review", "error")}
+        item["repair_context"]["integration"] = integration
+        item.setdefault("code_job_history", []).append(code["id"])
+        if attempt > 6:
+            raise ValueError("自动修复连续六批仍未通过，已保留全部代码与检查记录。需要排查模型或接口实现；原审核仍有效，可继续执行，无需重新审核需求。")
+        item["code_job_id"] = None
+        item.update(status="running", error=None)
+        self.event(item, "code", f"{reason}，自动进入第 {attempt} 批修复；沿用原批准方案，无需重新审核。")
+        await self.run(item)
+
     def assemble(self, item, code, root):
+        sources = code["files"]
         files = {}
-        for source in code["files"]:
+        for source in sources:
             name = source["path"]
             if not name.startswith(("behavior_pack/", "resource_pack/")):
                 raise ValueError("程序产物不符合行为包/资源包目录合同：" + name)
@@ -380,8 +423,9 @@ class DeliveryEngine:
         checks = []
         def add(level, message): checks.append({"level": level, "message": message})
         python = {p: data.decode("utf-8") for p, data in files.items() if p.endswith(".py")}
-        if not any(p.endswith("/modMain.py") and "@Mod.Binding" in text and "@Mod.Init" in text for p, text in python.items()):
-            add("error", "缺少中国版 ModSDK 的 modMain.py 入口及 Mod.Binding / Mod.Init。")
+        checks.extend(sdk_checks([{"path": path, "content": content} for path, content in python.items()]))
+        if not any(p.endswith("/modMain.py") and "@Mod.Binding" in text and ("@Mod.InitServer" in text or "@Mod.Init" in text) for p, text in python.items()):
+            add("error", "缺少中国版 ModSDK 的 modMain.py 入口及 Mod.Binding / Mod.InitServer。")
         for path in python:
             folder = Path(path).parent
             while folder.as_posix() not in {"behavior_pack", "resource_pack", "."}:

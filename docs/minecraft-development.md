@@ -34,24 +34,6 @@ DGXSparkCraft 的开发工作台把圆桌结论、上传仓库和编码产物连
 
 主程序可在 DGX Spark 的 Python 3 环境中检索和产出 Python 2 源文件；目标引擎语法、可导入模块与 API 可用性是另一层约束。VS Code 的补全、主机 AST 解析与真实游戏运行分别记录。
 
-## 独立使用可信校验器
-
-在项目根目录执行，参数指向待审阅产物目录：
-
-```bash
-python3 skills/modsdk-coding/scripts/validate_modsdk.py /absolute/path/to/workspace --runtime python2
-```
-
-校验器不执行产物代码。它检查 JSON 解析、重复键和非有限值、Python 3 主机语法、部分 Python 2 明确不兼容语法、编码声明及可确定的端别导入混用。对 Python 2 始终保留未执行目标解释器检查的警告。退出码 0 仅表示这些检查未发现错误，不能作为模组可运行证明。[完整范围与限制](../skills/modsdk-coding/references/validation.md)。
-
-可信校验器的行为测试：
-
-```bash
-python3 skills/modsdk-coding/evals/test_validation.py -v
-```
-
-它验证非法 JSON、Python 2/3 混用、端别导入、符号链接和文件大小边界，同时确认项目代码从未被执行。面向模型的前向评估题位于两个 Skill 的 `evals/evals.json`，题目不是已经完成的模型评测成绩。
-
 ## 开发 API
 
 以下为本地服务接口；默认服务地址与启动配置见项目 README。

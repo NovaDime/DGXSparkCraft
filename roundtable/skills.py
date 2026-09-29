@@ -45,6 +45,11 @@ class SkillCatalog:
                 name_in_skill = ref.relative_to(folder).as_posix()
                 references.append(name_in_skill)
                 reference_contents[name_in_skill] = ref.read_text(encoding="utf-8")
+        if getattr(self, 'learning', None):
+            learned = self.learning.context(skill_id)
+            if learned:
+                reference_contents['learned/repository-lessons.md'] = learned
+                references.append('learned/repository-lessons.md')
         return {"id": skill_id, "name": name.group(1).strip().strip("\"'"),
                 "description": description.group(1).strip().strip("\"'"),
                 "content": content, "references": references, "reference_contents": reference_contents,

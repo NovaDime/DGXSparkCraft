@@ -3,7 +3,19 @@
   "skill_id": "minecraft-audio",
   "version": "0.1.0",
   "description": "NPC dialogue and item/interaction sound design review.",
-  "requirements": {"role": "audio", "meeting_participant": true, "model_route": "spark_local", "tool_permissions": "deny_all_by_default", "credential_values_in_card": false},
-  "references": ["SKILL.md"],
-  "trust": {"signature": {"status": "unsigned"}}
+  "requirements": {
+    "role": "audio",
+    "meeting_participant": true,
+    "model_route": "spark_local",
+    "tool_permissions": "deny_all_by_default",
+    "credential_values_in_card": false
+  },
+  "references": [
+    "SKILL.md"
+  ],
+  "trust": {
+    "signature": {
+      "status": "unsigned"
+    }
+  }
 }

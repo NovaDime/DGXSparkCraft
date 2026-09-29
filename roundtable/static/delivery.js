@@ -8,7 +8,8 @@
   const panel = el("section", "panel delivery-panel"); panel.id = "delivery-panel"; panel.hidden = true;
   panel.innerHTML = `<div class="panel-title"><div><span class="section-number">FROM CONSENSUS TO CREATION</span><h2>确认方案，进入开发圆桌</h2></div><span class="pill" id="delivery-status"></span></div>
     <ol class="delivery-steps"><li>01 圆桌共识</li><li>02 人工审核</li><li>03 开发圆桌</li><li>04 集成打包</li></ol>
-    <p class="muted">讨论通过不等于开始制作。审核锁定方案、目标版本和音效描述后，策划整合数值，再逐项下发程序与素材任务，检查并汇总产物。</p>
+    <p class="muted">讨论完成后，请核对下方任务单并点击「审核通过，开始制作」。系统将自动下发任务、显示制作进度，完成后弹窗提供模组文件下载。</p>
+    <section class="production-progress" aria-live="polite"><h3 id="production-heading">制作流程</h3><ol id="production-stages"></ol><p id="production-detail"></p></section>
     <p id="delivery-error" class="form-error" role="alert" hidden></p>
     <details class="advanced"><summary>查看待批准的圆桌方案</summary><pre id="delivery-proposal" class="delivery-proposal"></pre></details>
     <form id="delivery-approval"><fieldset id="delivery-fields"><label for="delivery-title">模组名称</label><input id="delivery-title" maxlength="120" required>
@@ -19,7 +20,7 @@
     <h3>美术虾绘 · 计划素材</h3><pre id="delivery-art-plan" class="delivery-proposal"></pre><p class="field-help">多模态生成当前为测试版配置入口；有必需的新素材时，需修改为已有资源或等待适配器完成后再开工。</p><label for="delivery-resources">其他待制作素材 <span class="optional">每行一项</span></label><textarea id="delivery-resources" rows="2" placeholder="若需要新贴图、模型等，必须先解决；有未完成素材不能批准执行。"></textarea>
     <label for="delivery-notes">审核备注</label><textarea id="delivery-notes" rows="2" maxlength="2000"></textarea>
     <label class="checkbox-label"><input id="delivery-confirm" type="checkbox" required><span>我已审核方案与任务单，同意自动调用程序和音频模型执行（可能产生 API 费用）。</span></label>
-    <button id="delivery-approve" class="button primary" type="submit">审核通过并自动执行 ↗</button></fieldset></form>
+    <button id="delivery-approve" class="button primary" type="submit">审核通过，开始制作 ↗</button></fieldset></form>
     <details class="panel art-connection" id="audio-connection"><summary>调音虾尾 · 音频模型 API · <span id="audio-config-status">读取中</span></summary><p>用于 NPC 对话语音、物品与交互音效。默认使用 stepaudio-3-gen-preview；保存配置不会生成音频，人工批准制作任务后才会调用 StepFun。</p>
     <form id="audio-config-form" autocomplete="off"><label for="audio-endpoint">服务区域</label><select id="audio-endpoint"><option value="https://api.stepfun.com/v1/audio/generate">中国 · api.stepfun.com</option><option value="https://api.stepfun.ai/v1/audio/generate">国际 · api.stepfun.ai</option></select>
     <label for="audio-generation-model">音频模型</label><input id="audio-generation-model" value="stepaudio-3-gen-preview" maxlength="100" required>
@@ -66,6 +67,21 @@
     }
     window.dispatchEvent(new CustomEvent("sparkcraft:production",{detail:{role:active.has(item.status) ? ({planning:"planner",planning_handoff:"planner",audio:"audio",code:"engineer",integration:"reviewer",package:"host"}[item.stage] || "host") : null}}));
     delivery = item; panel.hidden = false; $("delivery-status").textContent = labels[item.status] || item.status;
+    const stages = [["planning","策划 · 整理任务单"],["approval","人工审核"],["planning_handoff","策划 / 数值 · 下发任务"],["audio","美术 / 调音 · 素材准备"],["code","程序 · 编码与修复"],["integration","审查 · 集成检查"],["package","打包 · 文件下载"]];
+    const eventStages = item.events.map(e=>e.stage);
+    let current = stages.findIndex(([key])=>key===item.stage);
+    if (item.status === "awaiting_approval") current=1;
+    if (item.status === "queued") current=2;
+    if (current<0) current=Math.max(0,...eventStages.map(key=>stages.findIndex(([s])=>s===key)));
+    $("production-heading").textContent = item.status === "packaged" ? "制作完成 · 文件已就绪" : `制作进度 · ${labels[item.status] || item.status}`;
+    $("production-stages").replaceChildren(...stages.map(([key,title],index)=>{
+      const done=item.status === "packaged" || index<current;
+      const row=el("li",done?"done":index===current?"current":"pending");
+      row.append(el("span","",done?"✓":String(index+1)),el("strong","",title),el("small","",done?"已完成":index===current?(active.has(item.status)?"进行中":labels[item.status]):"等待前序任务"));
+      if (key === "audio" && item.plan && !item.plan.assets.length && !(item.plan.art_assets || []).length) row.lastChild.textContent="复用现有资源 · 无需生成";
+      return row;
+    }));
+    $("production-detail").textContent = item.events.at(-1)?.message || "正在准备任务";
     $("delivery-error").hidden = !item.error; $("delivery-error").textContent = item.error || "";
     $("delivery-proposal").textContent = item.proposal;
     const editable = item.status === "awaiting_approval";
@@ -93,7 +109,7 @@
     if (item.code_job_id) $("delivery-code-link").href=`/api/development/jobs/${item.code_job_id}/download`;
   }
   async function loadConfig() { try { const c=await api("/api/audio/config"); $("audio-config-status").textContent=c.configured?"已配置":"未配置"; $("audio-endpoint").value=c.endpoint; $("audio-generation-model").value=c.model; } catch(e){$("audio-config-status").textContent="读取失败";$("audio-save-result").textContent=e.message;} }
-  window.addEventListener("sparkcraft:meeting", async event=> { meetingId=event.detail.id; delivery=null; panel.hidden=true; $("delivery-sounds").replaceChildren(); const v=++generation; if (!meetingId) return; try { const item=await api(`/api/meetings/${meetingId}/delivery`); if(v===generation && item) render(item); } catch(e){error(e);} });
+  window.addEventListener("sparkcraft:meeting", async event=> { meetingId=event.detail.id; delivery=null; panel.hidden=true; $("delivery-sounds").replaceChildren(); const v=++generation; if (!meetingId) return; try { const item=await api(`/api/meetings/${meetingId}/delivery`); if(v!==generation)return; if(item) render(item); else if(event.detail.status === "completed") { const prepared=await api(`/api/meetings/${meetingId}/delivery`,{}); if(v===generation)render(prepared); } } catch(e){error(e);} });
   window.addEventListener("sparkcraft:delivery", async event=> { meetingId=event.detail.id; const v=++generation; panel.hidden=false; $("delivery-status").textContent="正在整理任务单…"; try {const item=await api(`/api/meetings/${meetingId}/delivery`,{}); if(v===generation) {render(item); await loadConfig(); panel.scrollIntoView({behavior:"smooth",block:"start"});}}catch(e){error(e);} });
   $("delivery-add-sound").onclick=()=>soundRow();
   $("delivery-approval").onsubmit=async event=> { event.preventDefault(); if(!delivery)return; $("delivery-approve").disabled=true;
@@ -105,6 +121,6 @@
   $("delivery-stop").onclick=async()=>{try{render(await api(`/api/deliveries/${delivery.id}/cancel`,{}));}catch(e){error(e);}};
   $("delivery-retry").onclick=async()=>{if(!$("delivery-retry-confirm").checked){error(new Error("请先确认重试可能产生的 API 费用。"));return;}try{render(await api(`/api/deliveries/${delivery.id}/retry`,{confirmed:true}));$("delivery-retry-confirm").checked=false;}catch(e){error(e);}};
   $("delivery-revise-form").onsubmit=async event=>{event.preventDefault();$("delivery-revise-submit").disabled=true;try{const parent=await api(`/api/meetings/${delivery.meeting_id}`);const next=await api("/api/meetings",{topic:parent.topic,constraints:parent.constraints || "",max_rounds:Number($("rt-rounds").value),parent_meeting_id:parent.id,revision_notes:$("delivery-revise").value});window.dispatchEvent(new CustomEvent("sparkcraft:select-meeting",{detail:{id:next.id}}));panel.hidden=true;}catch(e){error(e);}finally{$("delivery-revise-submit").disabled=false;}};
-  setInterval(async()=>{if(pollBusy || !delivery || !active.has(delivery.status) || document.hidden)return; pollBusy=true;const v=generation,id=delivery.id;try{const item=await api(`/api/deliveries/${id}`);if(v===generation)render(item);}catch(e){error(e);}finally{pollBusy=false;}},2000);
+  setInterval(async()=>{if(pollBusy || !delivery || !active.has(delivery.status) || document.hidden)return; pollBusy=true;const v=generation,id=delivery.id;try{const item=await api(`/api/deliveries/${id}`);if(v===generation){render(item);if(item.code_job_id && item.status === "running"){const job=await api(`/api/development/jobs/${item.code_job_id}`);if(v===generation && delivery?.id===id) $("production-detail").textContent=job.events?.at(-1)?.message || "程序 Agent 正在制作";}}}catch(e){error(e);}finally{pollBusy=false;}},2000);
   loadConfig();
 })();

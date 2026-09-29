@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -56,9 +57,9 @@ class RoundtableEngine:
         stamp = now()
         meeting = {
             "id": uuid4().hex, "topic": request.topic, "constraints": request.constraints,
-            "parent_meeting_id": request.parent_meeting_id, "parent_proposal": parent["proposal"] if parent else "",
+            "parent_meeting_id": request.parent_meeting_id, "parent_proposal": self._last_substantive_proposal(parent) if parent else "",
             "revision_notes": request.revision_notes,
-            "max_rounds": request.max_rounds, "include_reviewer": True,
+            "max_rounds": request.max_rounds, "requested_rounds": request.max_rounds, "auto_converge": request.auto_converge, "include_reviewer": True,
             "provider_mode": self.settings.provider_mode, "status": "queued",
             "created_at": stamp, "updated_at": stamp, "current_round": 0,
             "proposal": "", "final_report": "", "error": None,
@@ -74,6 +75,12 @@ class RoundtableEngine:
         self._tasks[meeting["id"]] = task
         task.add_done_callback(lambda done, meeting_id=meeting["id"]: self._discard(meeting_id, done))
         return self.store.get(meeting["id"])
+
+    @staticmethod
+    def _last_substantive_proposal(meeting):
+        for value in [meeting['proposal']] + [t.get('proposal','') for t in reversed(meeting['turns']) if t['role_id']=='host']:
+            if value and not (re.match(r'^(沿用|保持原方案不变|同意原方案|无需修改)',value) and len(value)<500):return value
+        return meeting['topic']
 
     def _discard(self, meeting_id: str, task: asyncio.Task) -> None:
         self._tasks.pop(meeting_id, None)
@@ -131,8 +138,11 @@ class RoundtableEngine:
             else:
                 self._event(meeting, "resolution_ignored", f"未接受 {role_id} 对 {issue_id} 的关闭：仅提出者可复核自己的未解决问题。", role_id=role_id)
         for concern in result.concerns:
+            cited = re.findall(r"\bI\d{3,}\b", concern.title)
+            normalized = re.sub(r"^(?:I\d{3,}\s*[:：—\-]?\s*)+", "", concern.title).strip()
             duplicate = next((issue for issue in meeting["issues"]
-                              if issue["owner_role_id"] == role_id and issue["title"] == concern.title and issue["status"] == "open"), None)
+                              if issue["owner_role_id"] == role_id and issue["status"] == "open"
+                              and (issue["id"] in cited or issue["title"] == normalized)), None)
             if duplicate:
                 duplicate.update(detail=concern.detail, severity=concern.severity)
             else:
@@ -146,20 +156,21 @@ class RoundtableEngine:
         role = self.catalog.role(role_id, self.settings.agent_ids)
         role["model_ref"] = meeting.get("model_routes", {}).get(role_id)
         meeting["active_role_id"] = role_id
-        self._event(meeting, "turn_started", f"{role['name']}开始{'整理议题' if phase == 'opening' else '汇总讨论' if phase == 'synthesis' else '评审'}。",
+        self._event(meeting, "turn_started", f"{role['name']}开始{'整理议题' if phase == 'opening' else '汇总讨论' if phase == 'synthesis' else '协作设计'}。",
                     role_id=role_id, round=meeting["current_round"])
         context = {
             "meeting_id": meeting["id"], "round": meeting["current_round"], "phase": phase,
             "topic": meeting["topic"], "constraints": meeting["constraints"], "proposal": meeting["proposal"],
             "issues": [{key: item[key] for key in ("id", "owner_role_id", "title", "detail", "severity", "status")}
                        for item in meeting["issues"] if item["status"] == "open" and (phase == "synthesis" or item["owner_role_id"] == role_id)],
-            "round_reviews": reviews if phase == "synthesis" else [],
+            "round_reviews": [dict(review) for review in reviews],
             "own_open_issues": [item for item in meeting["issues"] if item["status"] == "open" and item["owner_role_id"] == role_id],
             "previous_proposal": meeting.get("parent_proposal", ""),
             "human_revision": meeting.get("revision_notes", ""),
+            "convergence_mode": meeting["current_round"] >= meeting.get("requested_rounds", meeting["max_rounds"]) - 1,
             "review_goal": "先核对自己已有问题是否被当前方案解决，解决则明确关闭；只提出本职责范围内阻碍方案成立的问题，后续实测放入建议。",
             "previous_summary": next((turn["summary"] for turn in reversed(meeting["turns"]) if turn["role_id"] == "host"), "") if phase == "synthesis" else "",
-            "remaining_token_budget": meeting.get("token_budget", MAX_MEETING_TOKENS) - meeting.get("budget_tokens", 0),
+            "remaining_token_budget": MAX_MEETING_TOKENS,
             "all_approve": all_approve,
         }
         if getattr(self, "official_knowledge", None):
@@ -167,8 +178,18 @@ class RoundtableEngine:
         if getattr(self, "knowledge", None):
             context["repository_knowledge"] = self.knowledge.search_all(meeting["topic"], limit=4)
         started = time.perf_counter()
-        async with asyncio.timeout(self.settings.request_timeout_seconds + 5):
-            raw = await self.provider.generate(role=role, context=context)
+        from .providers import ProviderError
+        try:
+            async with asyncio.timeout(3 * self.settings.request_timeout_seconds + 15):
+                raw = await self.provider.generate(role=role, context=context)
+        except ProviderError as exc:
+            if exc.code != "invalid_output":
+                raise
+            self._event(meeting, "protocol_deferred", f"{role['name']}本轮结构校验未通过，下一轮补发有效意见；该系统异常不写入玩法分歧。", role_id=role_id, round=meeting["current_round"])
+            raw = {"summary":"本轮模型输出未通过结构校验，尚未形成有效评审意见，下一轮需重新复核。",
+                   "stance":"revise", "proposal":("用户原始需求（主持提案未成功生成，待后续专业评审和主持汇总完善）：\n" + meeting["topic"][:10000]) if phase == "opening" else "", "concerns":[],
+                   "recommendations":["本轮未取得有效意见，下一轮重新完成本角色贡献；不是玩法缺陷。"], "resolved_issue_ids":[], "skill_ids":[],
+                   "usage":{"input_tokens":None,"output_tokens":None}, "budget_tokens":getattr(exc,"budget_tokens",0)}
         result = AgentResult.model_validate(raw)
         meeting["budget_tokens"] = meeting.get("budget_tokens", 0) + result.budget_tokens
         elapsed_ms = round((time.perf_counter() - started) * 1000)
@@ -201,24 +222,29 @@ class RoundtableEngine:
         try:
             async with self._lane:
                 meeting["status"] = "running"
-                self._event(meeting, "started", "开始规则模拟；以下内容不属于 AI 推理。" if meeting["provider_mode"] == "simulation" else "开始 OpenClaw 模型评审。")
+                self._event(meeting, "started", "开始规则模拟；以下内容不属于 AI 推理。" if meeting["provider_mode"] == "simulation" else "开始 OpenClaw 协作设计：各成员补全专业方案，主持人统一整合。")
                 opening = await self._turn(meeting, "host", "opening", [])
                 if not opening.proposal:
                     raise ValueError("主持者没有提供可供评审的初始方案。")
                 meeting["proposal"] = opening.proposal
                 self.store.save(meeting)
                 specialists = ["planner", "balance", "engineer", "audio", "art", "reviewer"]
-                for round_index in range(1, meeting["max_rounds"] + 1):
+                regular_limit = meeting["max_rounds"]
+                final_limit = min(1000, regular_limit + 3) if meeting.get("auto_converge") else regular_limit
+                for round_index in range(1, final_limit + 1):
+                    if round_index > regular_limit and meeting["max_rounds"] == regular_limit:
+                        meeting["max_rounds"] = final_limit
+                        self._event(meeting, "convergence_started", "进入自动收敛复核，最多追加三轮：主持修订已有问题，原提出者逐项核验。")
                     meeting["current_round"] = round_index
                     reviewed_proposal = meeting["proposal"]
-                    self._event(meeting, "round_started", f"第 {round_index} 轮：所有专业角色评审同一版方案。", round=round_index)
+                    self._event(meeting, "round_started", f"第 {round_index} 轮：各成员围绕当前方案协作补全制作内容。", round=round_index)
                     reviews: list[dict] = []
                     approved = []
                     for role_id in specialists:
                         result = await self._turn(meeting, role_id, "review", reviews)
                         approved.append(result.stance == "approve" and not result.concerns)
                         # Carry this round's relevant comments, not the entire transcript.
-                        reviews.append({"role_id": role_id, **result.model_dump(exclude={"usage", "proposal"})})
+                        reviews.append({"role_id": role_id, **result.model_dump(exclude={"usage"})})
                     no_open_issues = not any(item["status"] == "open" for item in meeting["issues"])
                     all_approve = all(approved) and no_open_issues
                     synthesis = await self._turn(meeting, "host", "synthesis", reviews, all_approve)
@@ -236,7 +262,7 @@ class RoundtableEngine:
                     else:
                         message = "仍有分歧、保留意见或新修订，继续评审。"
                     self._event(meeting, "round_completed", message, round=round_index)
-                self._finish(meeting, "needs_review", "已达到轮数上限。当前方案及所有保留意见已保存，尚未达成共识。")
+                self._finish(meeting, "needs_review", "本轮评审仍有未解决项。请查看问题清单，使用“继续收敛复核”继续修订；未将未完成评审标记为共识。")
         except asyncio.CancelledError:
             if meeting["status"] not in TERMINAL_STATUSES:
                 self._finish(meeting, "interrupted", "执行被中断；已保留完成的发言。")
