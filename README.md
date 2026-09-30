@@ -1,6 +1,6 @@
 <div align="center">
 
-![SparkCraft：助力开发你想要的世界](docs/images/sparkcraft-cover.png)
+![SparkCraft Lab 多智能体创作工作室](docs/images/sparkcraft-lab.jpg)
 
 # SparkCraft 1.2
 
